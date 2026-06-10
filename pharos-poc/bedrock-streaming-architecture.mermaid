@@ -1,0 +1,50 @@
+flowchart TB
+    subgraph ONPREM["On-Prem Network"]
+        UI1["On-Prem UI<br/>(fetch-based SSE client)"]
+        DNS1["On-prem DNS<br/>conditional forwarder"]
+    end
+
+    IDP["Shared OIDC IdP<br/>(Cognito / Okta / Azure AD)<br/>client-credentials → JWT"]
+
+    subgraph AWSVPC["AWS VPC — private subnets, 2+ AZs"]
+        UI2["AWS-hosted UI"]
+        R53["Route 53 Private Hosted Zone<br/>api.platform.internal → ALB"]
+        RESOLVER["Route 53 Resolver<br/>inbound endpoints"]
+        ALB["Internal ALB (HTTPS/ACM)<br/>idle timeout 300s · HTTP/1.1<br/>health check /health"]
+
+        subgraph ECS["ECS Fargate Service"]
+            API["FastAPI<br/>─ POST /v1/sessions → validate JWT, create session<br/>─ GET /v1/sessions/{id}/stream → SSE delivery<br/>(XREAD from Redis, Last-Event-ID resume)"]
+        end
+
+        subgraph PRODUCER["Producer (pick one)"]
+            PUMP1["Option A: asyncio task<br/>inside Fargate"]
+            PUMP2["Option B: Lambda pump<br/>(15-min cap, event-driven)"]
+        end
+
+        REDIS[("ElastiCache Redis<br/>Streams: XADD per chunk<br/>TTL 15 min · Multi-AZ")]
+        DDB[("DynamoDB<br/>session metadata:<br/>owner sub, status, timestamps")]
+        SFN["Step Functions (optional)<br/>ONLY if multi-stage agentic<br/>workflow — not for token relay"]
+        BR["AWS Bedrock<br/>InvokeModelWithResponseStream"]
+    end
+
+    UI1 -. "1- get JWT" .-> IDP
+    UI2 -. "1- get JWT" .-> IDP
+
+    UI1 -->|"Direct Connect / VPN"| ALB
+    DNS1 --> RESOLVER
+    UI2 --> ALB
+    R53 --- ALB
+
+    ALB --> API
+    API -->|"session record"| DDB
+    API ==>|"2- kick off generation"| PUMP1
+    API ==>|"or invoke async"| PUMP2
+    PUMP1 --> BR
+    PUMP2 --> BR
+    BR ==>|"token chunks"| PUMP1
+    BR ==>|"token chunks"| PUMP2
+    PUMP1 ==>|"XADD"| REDIS
+    PUMP2 ==>|"XADD"| REDIS
+    SFN -.->|"orchestrates stages,<br/>each stage XADDs progress"| REDIS
+    REDIS ==>|"XREAD blocking"| API
+    API ==>|"3- SSE events with id:<br/>resume via Last-Event-ID"| ALB
