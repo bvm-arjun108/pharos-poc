@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rule Hit Reporting Dashboard — Phase 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#10181f; --ink2:#33444f; --muted:#6b7c87; --faint:#93a3ac;
+  --line:#dce3e6; --line2:#eaeef0; --paper:#edf0f1; --card:#fff;
+  --harbor:#1b4965; --harbor-soft:#e7eef2;
+  --breach:#b3372a; --breach-soft:#f7e6e3;
+  --soon:#c07f16; --soon-soft:#faf0dc;
+  --watch:#5f7d8c; --ok:#1f7a4d; --ok-soft:#e4f1ea;
+  --iwra:#41628f; --pharos:#7a5ba8;
+  --r:3px; --shadow:0 1px 2px rgba(16,24,31,.06),0 4px 14px rgba(16,24,31,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--paper);color:var(--ink);font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.num{font-family:"IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{font-family:"Archivo",system-ui,sans-serif;margin:0}
+.wrap{max-width:1400px;margin:0 auto;padding:0 20px 56px}
+
+.topbar{background:var(--ink);color:#fff;border-bottom:3px solid var(--harbor)}
+.topbar-in{max-width:1400px;margin:0 auto;padding:14px 20px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.brandmark{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:#8fa9b8;border:1px solid #344854;padding:3px 7px;border-radius:2px;white-space:nowrap}
+.topbar h1{font-size:16px;font-weight:600;letter-spacing:-.01em}
+.topbar .sub{color:#8fa9b8;font-size:12px}
+.topbar-right{margin-left:auto;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.sel{background:#1b2830;border:1px solid #35474f;border-radius:var(--r);padding:6px 11px;font-family:"IBM Plex Mono",monospace;font-size:12px;color:#e7eef2;cursor:pointer}
+.fresh{font-size:11px;color:#8fa9b8;font-family:"IBM Plex Mono",monospace}
+.fresh b{color:#cfe0e8;font-weight:500}
+
+.eyebrow{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:9px;margin:24px 0 9px}
+.eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.card-h{padding:12px 15px;border-bottom:1px solid var(--line2);display:flex;align-items:center;gap:9px}
+.card-h h3{font-size:13px;font-weight:600}
+.card-h .src{margin-left:auto;font-size:10px;color:var(--faint);font-family:"IBM Plex Mono",monospace;letter-spacing:.06em}
+.pad{padding:15px}
+
+/* hero */
+.hero{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);margin-top:20px;overflow:hidden}
+.hero-top{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line2)}
+.hero-lede{padding:18px 20px;flex:1;min-width:300px}
+.hero-lede h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:5px}
+.hero-lede p{margin:0;color:var(--muted);font-size:12.5px;max-width:64ch}
+.hero-cur{padding:14px 18px;border-left:1px solid var(--line2);min-width:250px;background:#fafbfb}
+.hero-alert{padding:16px 20px;border-left:1px solid var(--line2);background:var(--breach-soft);min-width:222px;display:flex;flex-direction:column;justify-content:center}
+.hero-alert .lab{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--breach);font-weight:600}
+.hero-alert .big{font-family:"IBM Plex Mono",monospace;font-size:36px;font-weight:600;color:var(--breach);line-height:1.05;letter-spacing:-.02em}
+.hero-alert .sml{font-size:11.5px;color:#8a4c43;margin-top:3px;max-width:24ch}
+.hero-alert button{margin-top:10px;align-self:flex-start;background:var(--breach);color:#fff;border:0;border-radius:var(--r);padding:6px 11px;font-family:inherit;font-size:11.5px;font-weight:500;cursor:pointer}
+.hero-alert button:hover{background:#9a2d22}
+.hero-cur .t{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);margin-bottom:7px}
+.currow{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:12px}
+.currow .c{font-family:"IBM Plex Mono",monospace;font-weight:600;width:44px;flex:none}
+.currow .a{font-family:"IBM Plex Mono",monospace;margin-left:auto}
+.currow .h{color:var(--faint);font-family:"IBM Plex Mono",monospace;font-size:11px;width:56px;text-align:right;flex:none}
+.hero-cur .note{font-size:10.5px;color:var(--faint);margin-top:8px;border-top:1px dashed var(--line);padding-top:7px}
+
+.clock{padding:18px 20px 15px}
+.band{display:flex;height:58px;border:1px solid var(--line);border-radius:2px;overflow:hidden}
+.seg{position:relative;border:0;padding:0 0 0 12px;cursor:pointer;display:flex;flex-direction:column;justify-content:center;align-items:flex-start;color:#fff;font-family:inherit;text-align:left;overflow:hidden;transition:filter .15s}
+.seg:hover{filter:brightness(1.08)}
+.seg:focus-visible{outline:2px solid var(--ink);outline-offset:-3px}
+.seg .c{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.seg .p{font-size:10.5px;opacity:.86;white-space:nowrap}
+.s1{background:#a8b7bf;color:var(--ink)} .s1 .p{opacity:.72}
+.s2{background:var(--watch)} .s3{background:var(--soon)} .s4{background:#9a5f2a} .s5{background:var(--breach)}
+.axis{display:flex;margin-top:7px;font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted)}
+.clock-foot{margin-top:12px;padding-top:11px;border-top:1px dashed var(--line);font-size:11.5px;color:var(--muted)}
+.clock-foot b{color:var(--ink2);font-weight:600}
+
+/* kpi */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 15px;box-shadow:var(--shadow)}
+.kpi .lab{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.kpi .v{font-family:"IBM Plex Mono",monospace;font-size:29px;font-weight:600;letter-spacing:-.025em;margin-top:6px;line-height:1.05}
+.kpi .d{font-size:11.5px;color:var(--muted);margin-top:4px}
+.kpi.ok .v{color:var(--ok)} .kpi.warn .v{color:var(--soon)}
+.kpi .src{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--faint);margin-top:7px;padding-top:6px;border-top:1px solid var(--line2)}
+
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid37{display:grid;grid-template-columns:1fr 1.25fr;gap:12px}
+
+/* split rows */
+.srow{display:flex;align-items:center;gap:10px;padding:9px 0}
+.srow+.srow{border-top:1px solid var(--line2)}
+.srow .n{width:158px;flex:none;font-size:12px}
+.srow .n small{display:block;color:var(--faint);font-size:10.5px;line-height:1.3}
+.srow .track{flex:1;height:16px;background:var(--line2);border-radius:2px;overflow:hidden}
+.srow .fill{height:100%}
+.srow .v{width:88px;text-align:right;font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-weight:500;flex:none}
+.srow .p{width:50px;text-align:right;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);flex:none}
+
+/* tables */
+table{width:100%;border-collapse:collapse}
+thead th{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:500;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap;background:#fafbfb}
+thead th.r{text-align:right}
+tbody td{padding:10px;border-bottom:1px solid var(--line2);font-size:12.5px}
+tbody td.r{text-align:right;font-family:"IBM Plex Mono",monospace}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:#f5f8f9}
+tfoot td{padding:10px;font-size:12.5px;font-weight:600;border-top:1.5px solid var(--ink);background:#fafbfb}
+tfoot td.r{text-align:right;font-family:"IBM Plex Mono",monospace}
+.minibar{display:flex;align-items:center;gap:7px;justify-content:flex-end}
+.minibar .t{width:56px;height:5px;background:var(--line2);border-radius:3px;overflow:hidden}
+.minibar .f{height:100%;background:var(--ok)}
+.minibar .f.low{background:var(--soon)}
+.aged{font-family:"IBM Plex Mono",monospace;font-weight:600;color:var(--breach)}
+.varneg{color:var(--breach);font-weight:600}
+
+.modal-legend{font-size:11.5px;color:var(--muted);margin-top:10px;padding-top:9px;border-top:1px dashed var(--line)}
+
+/* modal */
+.scrim{position:fixed;inset:0;background:rgba(16,24,31,.42);display:none;align-items:flex-start;justify-content:center;padding:36px 20px;z-index:60;overflow:auto}
+.scrim.on{display:flex}
+.modal{background:var(--card);border-radius:4px;width:100%;max-width:1160px;box-shadow:0 20px 60px rgba(16,24,31,.3);border:1px solid var(--line)}
+.modal-h{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+.modal-h h3{font-size:15px;font-weight:600}
+.modal-h .x{margin-left:auto;background:none;border:1px solid var(--line);border-radius:var(--r);width:26px;height:26px;cursor:pointer;color:var(--muted);font-size:15px;line-height:1}
+.tabs{display:flex;gap:2px;padding:0 18px;border-bottom:1px solid var(--line);background:#fafbfb;flex-wrap:wrap}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;cursor:pointer;font-family:inherit;font-size:12px;color:var(--muted);font-weight:500}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--harbor)}
+.tab .cnt{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--faint);margin-left:5px}
+.filters{padding:13px 18px;display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--line2)}
+.f{display:flex;flex-direction:column;gap:3px}
+.f label{font-family:"IBM Plex Mono",monospace;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.f select,.f input{font-family:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:var(--r);background:#fff;color:var(--ink);min-width:116px}
+.f input{font-family:"IBM Plex Mono",monospace}
+.btn{background:var(--harbor);color:#fff;border:0;border-radius:var(--r);padding:6px 13px;font-family:inherit;font-size:12px;cursor:pointer}
+.btn.ghost{background:#fff;color:var(--ink2);border:1px solid var(--line)}
+.modal-body{max-height:50vh;overflow:auto}
+.modal-f{padding:12px 18px;display:flex;align-items:center;gap:12px;border-top:1px solid var(--line);flex-wrap:wrap}
+.modal-f .cnt{font-size:12px;color:var(--muted);font-family:"IBM Plex Mono",monospace}
+.age{font-family:"IBM Plex Mono",monospace;font-size:11.5px;font-weight:500}
+.age.a5{color:var(--breach)} .age.a4{color:#9a5f2a} .age.a3{color:var(--soon)} .age.a2,.age.a1{color:var(--muted)}
+
+.foot{margin-top:24px;padding-top:13px;border-top:1px solid var(--line);color:var(--faint);font-size:11px}
+.foot code{font-family:"IBM Plex Mono",monospace;background:#e3e8ea;padding:1px 4px;border-radius:2px}
+
+@media (max-width:1080px){.kpis{grid-template-columns:repeat(2,1fr)}.grid2,.grid37{grid-template-columns:1fr}}
+@media (max-width:640px){.kpis{grid-template-columns:1fr}.srow .n{width:120px}.srow .p{display:none}.seg .p{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-in">
+    <span class="brandmark">Pharos · Compliance Ops</span>
+    <div>
+      <h1>Rule Hit Reporting Dashboard</h1>
+      <div class="sub">01–31 May 2025 · what got hit, what got reported, what is still open</div>
+    </div>
+    <div class="topbar-right">
+      <button class="sel">01 May 2025 – 31 May 2025 ▾</button>
+      <button class="sel">Report group: All ▾</button>
+      <button class="sel">Source: All ▾</button>
+      <div class="fresh">Refreshed <b>01 Jun 10:30</b></div>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-top">
+      <div class="hero-lede">
+        <h2>9,887 hits still need reporting</h2>
+        <p>These hits carry no exclusion reason and have not been reported. The band below ages them by <b>transaction_date</b> — the further right, the longer they have been sitting.</p>
+      </div>
+      <div class="hero-alert">
+        <div class="lab">Over 30 days old</div>
+        <div class="big">152</div>
+        <div class="sml">Oldest is 46 days. Past the window for every group.</div>
+        <button data-open="a5">Work these first →</button>
+      </div>
+      <div class="hero-cur">
+        <div class="t">Open value by currency</div>
+        <div class="currow"><span class="c">USD</span><span class="a">18,412,905</span><span class="h">7,102</span></div>
+        <div class="currow"><span class="c">EUR</span><span class="a">4,903,118</span><span class="h">1,588</span></div>
+        <div class="currow"><span class="c">GBP</span><span class="a">2,140,662</span><span class="h">704</span></div>
+        <div class="currow"><span class="c" style="color:var(--muted)">+12</span><span class="a" style="color:var(--muted)">mixed</span><span class="h">493</span></div>
+        <div class="note">Shown per currency, never summed — no FX table in Phase 1.</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="band" id="band"></div>
+      <div class="axis" id="axis"></div>
+      <div class="clock-foot">
+        Age = <b>CURRENT_DATE − transaction_date</b>. <b>152 hits are over 30 days old</b> — past the filing window for every report group we run. Work the band right to left.
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="eyebrow">This period</div>
+  <div class="kpis">
+    <div class="kpi">
+      <div class="lab">Total rule hits</div>
+      <div class="v num">1,245,678</div>
+      <div class="d">everything the rule engine produced</div>
+      <div class="src">rule_hit</div>
+    </div>
+    <div class="kpi">
+      <div class="lab">Requires reporting</div>
+      <div class="v num">1,102,345</div>
+      <div class="d">88.5% of total · 143,333 excluded</div>
+      <div class="src">exclusion_reason_id IS NULL</div>
+    </div>
+    <div class="kpi ok">
+      <div class="lab">Reported</div>
+      <div class="v num">99.10%</div>
+      <div class="d">1,092,458 of 1,102,345</div>
+      <div class="src">is_reported = true</div>
+    </div>
+    <div class="kpi warn">
+      <div class="lab">Still open</div>
+      <div class="v num">9,887</div>
+      <div class="d">152 of them over 30 days old</div>
+      <div class="src">not reported, not excluded</div>
+    </div>
+  </div>
+
+  <!-- DISPOSITION + LAG -->
+  <div class="eyebrow">Where every hit went</div>
+  <div class="grid37">
+    <div class="card">
+      <div class="card-h"><h3>Hit disposition</h3><span class="src">rule_hit</span></div>
+      <div class="pad" id="disp"></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Days from transaction to report</h3><span class="src">reporting_timestamp − transaction_date</span></div>
+      <div class="pad"><div id="lag"></div></div>
+    </div>
+  </div>
+
+  <!-- EXCLUSIONS + RECON -->
+  <div class="eyebrow">Exclusions and reconciliation</div>
+  <div class="grid2">
+    <div class="card">
+      <div class="card-h"><h3>Why hits were excluded</h3><span class="src">exclusion_reason_id</span></div>
+      <div class="pad" id="excl"></div>
+      <div class="pad" style="padding-top:0"><div id="invTrend"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-h"><h3>Pharos vs IWRA</h3><span class="src">rule_hit_reconciliation · latest seq_no</span></div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr>
+            <th>Report group</th><th class="r">IWRA published</th><th class="r">Pharos reported</th><th class="r">Missed</th>
+          </tr></thead>
+          <tbody id="reconBody"></tbody>
+          <tfoot><tr><td>Total</td><td class="r">1,092,610</td><td class="r">1,092,458</td><td class="r varneg">152</td></tr></tfoot>
+        </table>
+      </div>
+      <div class="pad" style="font-size:11.5px;color:var(--muted)">
+        <b style="color:var(--ink2)">Missed</b> is <code style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">missed_rule_hits_count_pharos</code>, deduplicated to the latest <code style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">seq_no</code> per run_date so re-runs are not counted twice.
+      </div>
+    </div>
+  </div>
+
+  <!-- GROUP TABLE -->
+  <div class="eyebrow">By report group</div>
+  <div class="card">
+    <div class="card-h"><h3>Report group breakdown</h3><span class="src">click a row to drill through</span></div>
+    <div style="overflow:auto">
+      <table>
+        <thead><tr>
+          <th>Report group</th>
+          <th class="r">Total hits</th>
+          <th class="r">Excluded</th>
+          <th class="r">Requires reporting</th>
+          <th class="r">Reported</th>
+          <th class="r">Still open</th>
+          <th class="r">Reported %</th>
+          <th class="r">Over 30 days</th>
+        </tr></thead>
+        <tbody id="grpBody"></tbody>
+        <tfoot><tr>
+          <td>Total</td><td class="r">1,245,678</td><td class="r">143,333</td><td class="r">1,102,345</td>
+          <td class="r">1,092,458</td><td class="r">9,887</td><td class="r">99.10%</td><td class="r" style="color:var(--breach)">152</td>
+        </tr></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="foot">
+    Every figure reads from <code>rule_hit</code> and <code>rule_hit_reconciliation</code> only — no new tables, no lookups, no FX.
+    Period is anchored on <code>transaction_date</code> so hits with a null <code>reporting_timestamp</code> stay in the denominator.
+    Numbers tie: excluded + reported + open = total, and group rows sum to every column.
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="scrim" id="scrim" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal">
+    <div class="modal-h">
+      <h3 id="mTitle">Open rule hits</h3>
+      <button class="x" id="closeM" aria-label="Close">×</button>
+    </div>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div class="filters">
+      <div class="f"><label>External txn key</label><input placeholder="12000012345"></div>
+      <div class="f"><label>Galactic ID</label><input placeholder="G1A2B3"></div>
+      <div class="f"><label>MTCN</label><input placeholder="MTCN1234567"></div>
+      <div class="f"><label>Report group</label><select><option>All</option><option>SIPESAT</option><option>CTR</option><option>SAR</option><option>TTR</option><option>Other Reports</option></select></div>
+      <div class="f"><label>Rule ID</label><select><option>All</option><option>R01</option><option>R02</option><option>R04</option><option>R07</option><option>R09</option><option>R11</option></select></div>
+      <div class="f"><label>Source</label><select><option>All</option><option>IWRA</option><option>PHAROS</option></select></div>
+      <div class="f"><label>Txn side</label><select><option>All</option><option>IN</option><option>OUT</option></select></div>
+      <button class="btn">Apply filters</button>
+      <button class="btn ghost">Reset</button>
+    </div>
+    <div class="modal-body">
+      <table>
+        <thead><tr>
+          <th>Age</th><th>Group</th><th>Rule</th><th>Attempt ID</th><th>External txn key</th>
+          <th>MTCN</th><th>Galactic ID</th><th class="r">Amount</th><th>Ccy</th><th>Source</th><th>Side</th><th>Txn date</th>
+        </tr></thead>
+        <tbody id="mBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-f">
+      <span class="cnt" id="mCount"></span>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn ghost">Export to CSV</button>
+        <button class="btn">Open oldest first</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+const fmt = n => n.toLocaleString('en-US');
+const days = 31;
+
+/* ---- age band ---- */
+const bands = [
+  {k:'a1', cls:'s1', n:5412, lab:'0–3 days',   ax:'0d'},
+  {k:'a2', cls:'s2', n:2338, lab:'4–7 days',   ax:'4d'},
+  {k:'a3', cls:'s3', n:1285, lab:'8–14 days',  ax:'8d'},
+  {k:'a4', cls:'s4', n:700,  lab:'15–30 days', ax:'15d'},
+  {k:'a5', cls:'s5', n:152,  lab:'Over 30 days',ax:'30d+'}
+];
+const band=document.getElementById('band'), axis=document.getElementById('axis');
+const w=bands.map(b=>Math.sqrt(b.n)), ws=w.reduce((a,b)=>a+b,0);
+bands.forEach((b,i)=>{
+  const pct=w[i]/ws*100;
+  const el=document.createElement('button');
+  el.className='seg '+b.cls; el.style.flex='0 0 '+pct+'%';
+  el.setAttribute('data-open',b.k); el.title=b.lab+' — '+fmt(b.n)+' hits';
+  el.innerHTML='<span class="c">'+fmt(b.n)+'</span><span class="p">'+b.lab+'</span>';
+  band.appendChild(el);
+  const a=document.createElement('span'); a.style.flex='0 0 '+pct+'%'; a.textContent=b.ax; axis.appendChild(a);
+});
+
+/* ---- disposition ---- */
+const disp=[
+  {n:'Total rule hits', s:'everything produced', v:1245678, c:'#8fa3ad'},
+  {n:'Excluded', s:'exclusion_reason_id set', v:143333, c:'#4f9a72'},
+  {n:'Requires reporting', s:'no exclusion reason', v:1102345, c:'var(--harbor)'},
+  {n:'Reported', s:'is_reported = true', v:1092458, c:'var(--ok)'},
+  {n:'Still open', s:'not reported, not excluded', v:9887, c:'var(--soon)'},
+  {n:'Over 30 days old', s:'oldest of the open backlog', v:152, c:'var(--breach)'}
+];
+document.getElementById('disp').innerHTML=disp.map(r=>`
+  <div class="srow">
+    <div class="n">${r.n}<small>${r.s}</small></div>
+    <div class="track"><div class="fill" style="width:${Math.max(r.v/1245678*100,0.4)}%;background:${r.c}"></div></div>
+    <div class="v">${fmt(r.v)}</div>
+    <div class="p">${(r.v/1245678*100).toFixed(2)}%</div>
+  </div>`).join('');
+
+/* ---- exclusions ---- */
+const ex=[
+  {n:'Transaction already reported', v:82001},
+  {n:'Duplicate Galactic ID', v:35682},
+  {n:'Invalid Data', v:13914, bad:true},
+  {n:'Out of Scope', v:6872},
+  {n:'Other', v:4864}
+];
+const exMax=Math.max(...ex.map(e=>e.v));
+document.getElementById('excl').innerHTML=ex.map(e=>`
+  <div class="srow">
+    <div class="n">${e.n}</div>
+    <div class="track"><div class="fill" style="width:${e.v/exMax*100}%;background:${e.bad?'var(--breach)':'#4f9a72'}"></div></div>
+    <div class="v">${fmt(e.v)}</div>
+    <div class="p">${(e.v/143333*100).toFixed(1)}%</div>
+  </div>`).join('') +
+  `<div class="modal-legend"><b style="color:var(--breach)">Invalid Data</b> is the only reason here that is a defect rather than correct behaviour — those 13,914 hits were dropped because upstream data was unusable, not because they were out of scope. Trend below.</div>`;
+
+/* ---- recon table ---- */
+const recon=[
+  ['SIPESAT',318855,318808,47],
+  ['CTR',262827,262788,39],
+  ['SAR',168350,168329,21],
+  ['TTR',122261,122243,18],
+  ['Other Reports',220317,220290,27]
+];
+document.getElementById('reconBody').innerHTML=recon.map(r=>`
+  <tr><td>${r[0]}</td><td class="r">${fmt(r[1])}</td><td class="r">${fmt(r[2])}</td><td class="r varneg">${r[3]}</td></tr>`).join('');
+
+/* ---- group table ---- */
+const grp=[
+  ['SIPESAT',101,362544,40755,321789,318808,2981,47],
+  ['CTR',102,298765,33333,265432,262788,2644,39],
+  ['SAR',103,186421,16590,169831,168329,1502,21],
+  ['TTR',104,142987,19531,123456,122243,1213,18],
+  ['Other Reports',105,254961,33124,221837,220290,1547,27]
+];
+document.getElementById('grpBody').innerHTML=grp.map(g=>{
+  const pct=g[5]/g[4]*100;
+  return `<tr class="click" tabindex="0" data-open="open">
+    <td><b>${g[0]}</b> <span style="color:var(--faint);font-family:'IBM Plex Mono',monospace;font-size:10.5px">${g[1]}</span></td>
+    <td class="r">${fmt(g[2])}</td>
+    <td class="r" style="color:var(--muted)">${fmt(g[3])}</td>
+    <td class="r">${fmt(g[4])}</td>
+    <td class="r">${fmt(g[5])}</td>
+    <td class="r" style="color:var(--soon)">${fmt(g[6])}</td>
+    <td class="r"><span class="minibar"><span class="t"><span class="f ${pct<99.05?'low':''}" style="width:${(pct-98)*100/2}%"></span></span>${pct.toFixed(2)}%</span></td>
+    <td class="r aged">${g[7]}</td>
+  </tr>`;
+}).join('');
+
+/* ---- charts ---- */
+function seeded(i,s){const x=Math.sin(i*12.9898+s*78.233)*43758.5453;return x-Math.floor(x);}
+function niceStep(r,t){const raw=r/t,m=Math.pow(10,Math.floor(Math.log10(raw))),n=raw/m;return (n<=1?1:n<=2?2:n<=2.5?2.5:n<=5?5:10)*m;}
+function chart(el,series,o){
+  const W=560,H=o.h||160,P={t:12,r:34,b:24,l:44};
+  const all=series.flatMap(s=>s.d);
+  let min=o.zero?0:Math.min(...all), max=Math.max(...all);
+  const st0=niceStep((max-min)||1,3);
+  max=Math.ceil(max/st0)*st0; if(!o.zero) min=Math.floor(min/st0)*st0;
+  const step=niceStep(max-min,3);
+  const X=i=>P.l+i*(W-P.l-P.r)/(days-1), Y=v=>P.t+(max-v)/(max-min)*(H-P.t-P.b);
+  let g='';
+  for(let v=min;v<=max+1e-9;v+=step){
+    const y=Y(v);
+    g+=`<line x1="${P.l}" y1="${y.toFixed(1)}" x2="${W-P.r}" y2="${y.toFixed(1)}" stroke="#eaeef0"/>`;
+    g+=`<text x="${P.l-7}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="#93a3ac">${o.fmtY?o.fmtY(v):Math.round(v)}</text>`;
+  }
+  let paths='';
+  series.forEach(s=>{
+    const d=s.d.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ');
+    if(s.area) paths+=`<path d="${d} L ${X(days-1)} ${Y(min)} L ${X(0)} ${Y(min)} Z" fill="${s.c}" opacity=".08"/>`;
+    paths+=`<path d="${d}" fill="none" stroke="${s.c}" stroke-width="1.7" stroke-linejoin="round"/>`;
+    if(s.mark!=null) paths+=`<circle cx="${X(s.mark)}" cy="${Y(s.d[s.mark])}" r="3.5" fill="#fff" stroke="${s.c}" stroke-width="2"/>`;
+  });
+  let ticks='';
+  [0,7,14,21,30].forEach(i=>{
+    const a=i===0?'start':(i===30?'end':'middle');
+    ticks+=`<text x="${X(i).toFixed(1)}" y="${H-7}" text-anchor="${a}" font-family="IBM Plex Mono" font-size="9" fill="#93a3ac">${i+1} May</text>`;
+  });
+  const leg=series.filter(s=>s.name).map(s=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--muted)"><span style="width:12px;height:2px;background:${s.c};display:inline-block"></span>${s.name}</span>`).join('<span style="width:14px;display:inline-block"></span>');
+  el.innerHTML=(leg?`<div style="margin-bottom:6px">${leg}</div>`:'')+
+    `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img">${g}${paths}${ticks}</svg>`+
+    (o.caption?`<div style="font-size:11px;color:var(--muted);margin-top:4px">${o.caption}</div>`:'');
+}
+const med=Array.from({length:days},(_,i)=>+(3.4+seeded(i,1)*1.6+(i>19?0.7:0)).toFixed(1));
+const p95=Array.from({length:days},(_,i)=>+(9.2+seeded(i,2)*4.0+(i>19?1.8:0)).toFixed(1));
+chart(document.getElementById('lag'),[
+  {d:p95,c:'#c07f16',name:'p95'},{d:med,c:'#1b4965',name:'Median',area:true}
+],{h:168,zero:true,fmtY:v=>v.toFixed(0)+'d',
+   caption:'Median holds near 4 days. The p95 tail stretched past 14 days in the last week of May — that tail is what becomes the over-30-day backlog.'});
+
+const inv=Array.from({length:days},(_,i)=> i===13?2553:Math.round(310+seeded(i,3)*180));
+chart(document.getElementById('invTrend'),[{d:inv,c:'#b3372a',area:true,mark:13}],
+  {h:112,zero:true,fmtY:v=>fmt(Math.round(v)),
+   caption:'Invalid Data by day. The 14 May spike is an upstream feed problem, not a reporting decision — worth a same-day ticket.'});
+
+/* ---- drilldown ---- */
+const rows=[
+  ['SIPESAT','R07','8765432102','120000012346','MTCN1234567','G1A2B3','8,000.00','USD','IWRA','OUT','30 May 2025'],
+  ['CTR','R04','8765432103','120000022347','MTCN2233445','G9C8D7','1,200.00','USD','PHAROS','IN','29 May 2025'],
+  ['SAR','R02','8765432104','120000032348','MTCN9988776','G5F6E7','2,300.00','EUR','IWRA','OUT','29 May 2025'],
+  ['TTR','R11','8765432105','120000042349','MTCN5647382','G4H3J8','5,600.00','USD','IWRA','OUT','28 May 2025'],
+  ['CTR','R09','8765432106','120000022350','MTCN1122334','G9C8D7','1,750.00','GBP','PHAROS','IN','28 May 2025'],
+  ['Other Reports','R05','8765432107','120000052351','MTCN4455667','G2Z3Y1','3,100.00','USD','IWRA','OUT','27 May 2025'],
+  ['SIPESAT','R03','8765432108','120000012352','MTCN7788990','G1A2B3','2,600.00','USD','IWRA','OUT','27 May 2025'],
+  ['SAR','R06','8765432109','120000032353','MTCN3344556','G7H8J9','1,950.00','EUR','PHAROS','IN','26 May 2025'],
+  ['TTR','R12','8765432110','120000042354','MTCN6677889','G3J2K1','4,200.00','USD','IWRA','OUT','26 May 2025'],
+  ['CTR','R01','8765432111','120000022355','MTCN2211009','G9C8D7','12,400.00','USD','IWRA','OUT','25 May 2025'],
+  ['SAR','R02','8765432112','120000032356','MTCN8899001','G5F6E7','7,350.00','USD','IWRA','OUT','24 May 2025'],
+  ['SIPESAT','R07','8765432113','120000012357','MTCN3312445','G1A2B3','990.00','GBP','PHAROS','IN','23 May 2025']
+];
+const views={
+  a5:{t:'Open over 30 days — oldest first',n:152,age:i=>({v:(46-i*2)+'d',c:'a5'})},
+  a4:{t:'Open 15–30 days',n:700,age:i=>({v:(30-i)+'d',c:'a4'})},
+  a3:{t:'Open 8–14 days',n:1285,age:i=>({v:(14-(i%7))+'d',c:'a3'})},
+  a2:{t:'Open 4–7 days',n:2338,age:i=>({v:(7-(i%4))+'d',c:'a2'})},
+  a1:{t:'Open 0–3 days',n:5412,age:i=>({v:(i%4)+'d',c:'a1'})},
+  open:{t:'All open rule hits',n:9887,age:i=>({v:(46-i*3)+'d',c:i<3?'a5':i<6?'a4':i<9?'a3':'a2'})}
+};
+const tabDefs=[['a5','Over 30 days',152],['a4','15–30 days',700],['a3','8–14 days',1285],['a2','4–7 days',2338],['a1','0–3 days',5412],['open','All open',9887]];
+document.getElementById('tabs').innerHTML=tabDefs.map(([k,l,c])=>`<button class="tab" role="tab" data-tab="${k}" aria-selected="false">${l}<span class="cnt">${fmt(c)}</span></button>`).join('');
+const scrim=document.getElementById('scrim');
+function render(v){
+  const V=views[v];
+  document.getElementById('mTitle').textContent=V.t;
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.tab===v));
+  document.getElementById('mBody').innerHTML=rows.map((r,i)=>{
+    const a=V.age(i);
+    return `<tr><td><span class="age ${a.c}">${a.v}</span></td><td>${r[0]}</td><td class="num">${r[1]}</td>
+      <td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td><td class="num">${r[5]}</td>
+      <td class="r">${r[6]}</td><td class="num">${r[7]}</td><td>${r[8]}</td><td>${r[9]}</td><td>${r[10]}</td></tr>`;
+  }).join('');
+  document.getElementById('mCount').textContent='Showing 1–12 of '+fmt(V.n)+' · oldest first';
+}
+function open(v){render(v);scrim.classList.add('on');document.body.style.overflow='hidden';document.getElementById('closeM').focus();}
+function close(){scrim.classList.remove('on');document.body.style.overflow='';}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-open]'); if(t){open(t.dataset.open);return;}
+  const tb=e.target.closest('.tab'); if(tb){render(tb.dataset.tab);return;}
+  if(e.target.id==='closeM'||e.target===scrim) close();
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&scrim.classList.contains('on')) close();
+  if(e.key==='Enter'){const t=e.target.closest('[data-open]'); if(t) open(t.dataset.open);}
+});
+})();
+</script>
+</body>
+</html>
