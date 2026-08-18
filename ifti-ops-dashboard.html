@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pharos Ops — IFTI Operations Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --blue:#2563eb; --blue-dk:#1d4ed8; --blue-soft:#eff4ff; --blue-line:#c7d9fb;
+  --red:#dc2626; --red-soft:#fef2f2; --red-line:#fbcfcf;
+  --amber:#d97706; --amber-soft:#fffbeb; --amber-line:#fde3ab;
+  --green:#16a34a; --green-soft:#f0fdf4; --green-line:#bbf7d0;
+  --ink:#0f172a; --ink2:#334155; --muted:#64748b; --faint:#94a3b8;
+  --line:#e2e8f0; --line2:#f1f5f9; --bg:#f6f8fb; --card:#fff;
+  --nav:#0f2744; --nav2:#1b3a5c;
+  --r:8px; --shadow:0 1px 2px rgba(15,23,42,.04),0 1px 3px rgba(15,23,42,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,sans-serif;font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+.num{font-variant-numeric:tabular-nums}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
+button{font-family:inherit}
+
+/* ================= layout ================= */
+.app{display:flex;min-height:100vh}
+.side{width:216px;flex:none;background:var(--nav);color:#c9d8ea;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+.brand{padding:18px 16px;display:flex;gap:10px;align-items:center;border-bottom:1px solid rgba(255,255,255,.08)}
+.logo{width:28px;height:28px;border-radius:7px;background:linear-gradient(140deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;flex:none}
+.logo svg{width:15px;height:15px}
+.brand .t{font-size:13.5px;font-weight:600;color:#fff;line-height:1.25}
+.brand .s{font-size:10.5px;color:#7f9dc0}
+.nav{padding:10px 8px;flex:1;overflow:auto}
+.nav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;color:#b9cbe0;text-decoration:none;font-size:12.5px;font-weight:500;margin-bottom:1px;cursor:pointer}
+.nav a:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav a.on{background:var(--blue);color:#fff}
+.nav a svg{width:15px;height:15px;flex:none;opacity:.9}
+.side-f{padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#7f9dc0}
+.side-f .u{color:#c9d8ea;font-weight:500;font-size:11.5px}
+.dot{width:7px;height:7px;border-radius:50%;background:#22c55e;display:inline-block;margin-right:5px}
+
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.head{background:#fff;border-bottom:1px solid var(--line);padding:14px 22px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;position:sticky;top:0;z-index:20}
+.head h1{font-size:18px}
+.head .sub{font-size:12px;color:var(--muted)}
+.head-r{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.body-area{flex:1;display:flex;min-width:0}
+.content{flex:1;padding:18px 22px 40px;min-width:0}
+
+/* ================= atoms ================= */
+.btn{border:1px solid var(--line);background:#fff;color:var(--ink2);border-radius:6px;padding:7px 12px;font-size:12.5px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--line2)}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:var(--blue-dk)}
+.btn svg{width:14px;height:14px}
+.date-pill{border:1px solid var(--line);background:#fff;border-radius:6px;padding:7px 12px;font-size:12.5px;color:var(--ink2);display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-width:0}
+.card-h{padding:13px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line2)}
+.card-h h3{font-size:13.5px}
+.card-h .n{font-size:11.5px;color:var(--faint);font-weight:400}
+.card-h .r{margin-left:auto}
+.pad{padding:16px}
+.link{color:var(--blue);font-weight:500;cursor:pointer;text-decoration:none;font-size:12.5px}
+.link:hover{text-decoration:underline}
+.card-f{padding:11px 16px;border-top:1px solid var(--line2);text-align:center}
+
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.b-red{background:var(--red-soft);color:var(--red);border:1px solid var(--red-line)}
+.b-amb{background:var(--amber-soft);color:var(--amber);border:1px solid var(--amber-line)}
+.b-grn{background:var(--green-soft);color:var(--green);border:1px solid var(--green-line)}
+.b-blu{background:var(--blue-soft);color:var(--blue-dk);border:1px solid var(--blue-line)}
+.b-gry{background:var(--line2);color:var(--muted);border:1px solid var(--line)}
+
+.delta{font-size:11.5px;font-weight:500;display:inline-flex;align-items:center;gap:2px}
+.up{color:var(--red)} .dn{color:var(--green)} .nu{color:var(--muted)}
+
+/* KPI */
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--shadow);min-width:0}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:500}
+.kpi .v{font-size:28px;font-weight:700;letter-spacing:-.03em;margin:4px 0 2px;line-height:1.1}
+.kpi .s{font-size:11.5px;color:var(--faint)}
+.kpi .d{margin-top:7px;padding-top:7px;border-top:1px solid var(--line2)}
+.kpi.alert .l{color:var(--red)} .kpi.alert .v{color:var(--red)}
+
+.g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.g2w{display:grid;grid-template-columns:minmax(0,1.34fr) minmax(0,1fr);gap:12px}
+.g3{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1fr) minmax(0,1.25fr);gap:12px}
+.g-half{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.mt12{margin-top:12px}
+
+/* legend list */
+.leg{display:flex;flex-direction:column;gap:9px;justify-content:center}
+.leg .row{display:flex;align-items:center;gap:8px;font-size:12px}
+.leg .sw{width:9px;height:9px;border-radius:2px;flex:none}
+.leg .nm{color:var(--ink2)}
+.leg .vl{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.leg .pc{color:var(--faint);font-size:11.5px;text-align:right;white-space:nowrap}
+
+/* bar list */
+.blist .row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.blist .nm{width:132px;flex:none;font-size:12px;color:var(--ink2)}
+.blist .tr{flex:1;height:15px;background:var(--line2);border-radius:4px;overflow:hidden}
+.blist .fl{height:100%;border-radius:4px}
+.blist .vl{width:22px;text-align:right;font-weight:600;font-size:12px;font-variant-numeric:tabular-nums}
+
+/* tables */
+table{width:100%;border-collapse:collapse}
+thead th{font-size:11px;font-weight:600;color:var(--muted);text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);white-space:nowrap;background:#fbfcfe}
+thead th.r{text-align:right}
+tbody td{padding:10px 11px;border-bottom:1px solid var(--line2);font-size:12.5px;white-space:nowrap}
+tbody td.r{text-align:right;font-variant-numeric:tabular-nums}
+tbody tr.click{cursor:pointer}
+tbody tr.click:hover{background:#f7faff}
+tbody tr:last-child td{border-bottom:0}
+.tlink{color:var(--blue);font-weight:600;cursor:pointer}
+.tlink:hover{text-decoration:underline}
+.red{color:var(--red);font-weight:600}
+.amb{color:var(--amber);font-weight:600}
+.grn{color:var(--green);font-weight:600}
+.zero{color:var(--faint)}
+.eye{width:26px;height:26px;border-radius:5px;border:1px solid var(--line);background:#fff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+.eye:hover{background:var(--blue-soft);color:var(--blue);border-color:var(--blue-line)}
+.eye svg{width:13px;height:13px}
+
+/* filter rail */
+.rail{width:344px;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px 18px;position:fixed;top:70px;right:16px;max-height:calc(100vh - 86px);overflow:auto;z-index:40;box-shadow:0 8px 28px rgba(15,23,42,.12)}
+.rail.hide{display:none}
+.rail-h{display:flex;align-items:center;margin-bottom:14px}
+.rail-h h3{font-size:14px}
+.rail-h .c{margin-left:auto;font-size:11px;color:var(--muted);cursor:pointer;font-weight:500;letter-spacing:.02em}
+.fgrp{margin-bottom:13px}
+.fgrp label{display:block;font-size:11.5px;font-weight:500;color:var(--ink2);margin-bottom:5px}
+.ctl{width:100%;border:1px solid var(--line);border-radius:6px;padding:7px 9px;font-size:12.5px;font-family:inherit;color:var(--ink);background:#fff}
+.ctl::placeholder{color:var(--faint)}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0 4px}
+.quick button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:5px 10px;font-size:11.5px;color:var(--ink2);cursor:pointer;font-weight:500}
+.quick button.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.rail-f{display:flex;gap:8px;margin-top:16px;padding-top:14px;border-top:1px solid var(--line2)}
+.rail-f .btn{flex:1;justify-content:center}
+.dash{display:flex;align-items:center;gap:7px;color:var(--faint);font-size:12px}
+
+/* breadcrumb */
+.crumbs{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
+.crumbs a{color:var(--blue);cursor:pointer;font-weight:500}
+.crumbs a:hover{text-decoration:underline}
+.crumbs .sep{color:var(--faint)}
+
+/* stat strip */
+.strip{display:flex;flex-wrap:wrap;min-width:0;border:1px solid var(--line);border-radius:var(--r);background:#fff;overflow:hidden;box-shadow:var(--shadow)}
+.strip .c{flex:1;min-width:118px;padding:13px 15px;border-right:1px solid var(--line2)}
+.strip .c:last-child{border-right:0}
+.strip .l{font-size:11.5px;color:var(--muted);font-weight:500}
+.strip .v{font-size:19px;font-weight:700;letter-spacing:-.02em;margin-top:2px}
+.strip .v small{font-size:11.5px;font-weight:600;margin-left:3px}
+
+/* tabs */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:16px 0 0;flex-wrap:wrap}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:9px 13px;font-size:12.5px;font-weight:500;color:var(--muted);cursor:pointer;margin-bottom:-1px}
+.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tab:hover{color:var(--ink)}
+
+/* panels */
+.panel{border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.panel-h{padding:9px 13px;background:var(--blue-soft);font-size:12px;font-weight:600;color:var(--blue-dk);border-bottom:1px solid var(--blue-line)}
+.panel-h.warn{background:var(--amber-soft);color:var(--amber);border-color:var(--amber-line)}
+.kv{display:flex;justify-content:space-between;gap:12px;padding:8px 13px;font-size:12.5px;border-bottom:1px solid var(--line2)}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--muted)}
+.kv .v{font-weight:600;font-variant-numeric:tabular-nums}
+
+/* journey */
+.jrow{display:flex;gap:13px;padding:12px 0;border-bottom:1px solid var(--line2);cursor:default}
+.jrow:last-child{border-bottom:0}
+.jrow.act{cursor:pointer}
+.jrow.act:hover{background:#fef6f6}
+.jdot{width:20px;height:20px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;margin-top:1px}
+.jd-ok{background:var(--green)} .jd-bad{background:var(--red)} .jd-skip{background:#cbd5e1;color:#64748b}
+.jbody{flex:1;min-width:0}
+.jtitle{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.jtitle .nm{font-size:13px;font-weight:600}
+.jtime{font-size:11.5px;color:var(--faint);margin-left:auto}
+.jmsg{font-size:12px;color:var(--muted);margin-top:3px}
+.jmsg.bad{color:var(--red);background:var(--red-soft);border:1px solid var(--red-line);padding:5px 9px;border-radius:5px;display:inline-block;margin-top:5px}
+.chev{color:var(--faint);flex:none;align-self:center}
+
+.hidden{display:none!important}
+.hint{font-size:11.5px;color:var(--muted)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px}
+
+@media (max-width:1500px){.rail{display:none}.g3{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:1100px){.side{display:none}.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.g2w,.g3,.g-half{grid-template-columns:minmax(0,1fr)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="side">
+    <div class="brand">
+      <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 7v10l8 5 8-5V7z"/></svg></div>
+      <div><div class="t">Pharos Ops</div><div class="s">IFTI Monitoring</div></div>
+    </div>
+    <nav class="nav" id="nav">
+      <a class="on" data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</a>
+      <a data-nav="batch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>Batch Investigation</a>
+      <a data-nav="group"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-6"/></svg>Report Group Health</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20v-8M6 20v-4M18 20V8"/></svg>Rule Performance</a>
+      <a data-nav="rulehits"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/></svg>Exceptions</a>
+      <a data-nav="failure"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16v6H4zM4 14h16v6H4z"/><path d="M8 7h.01M8 17h.01"/></svg>Transformation</a>
+      <a data-nav="batch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 2v6h-6"/><path d="M3 12a9 9 0 0 1 14-7.5L21 8"/><path d="M7 22v-6h6"/><path d="M21 12a9 9 0 0 1-14 7.5L3 16"/></svg>Reconciliation</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>Alerts</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>Reports</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Audit Logs</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>Data Dictionary</a>
+      <a data-nav="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.5.6.9 1.11 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>Settings</a>
+    </nav>
+    <div class="side-f">
+      Last Updated<div class="u">Aug 18, 2026 &nbsp;10:30 AM</div>
+      <div style="margin-top:8px"><span class="dot"></span>Auto Refresh <span style="color:#22c55e;font-weight:600">On</span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <!-- ================= HEADER ================= -->
+    <div class="head">
+      <div>
+        <h1 id="pgTitle">IFTI Operations Dashboard</h1>
+        <div class="sub" id="pgSub">End-to-end monitoring of rule hits, reporting and transformation</div>
+      </div>
+      <div class="head-r">
+        <span class="date-pill">Jul 1 – Jul 31, 2026
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+        </span>
+        <button class="btn" id="fBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.5V19l4 2v-8.5z"/></svg>Filters</button>
+        <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>Save View</button>
+        <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>Export</button>
+      </div>
+    </div>
+
+    <div class="body-area">
+      <div class="content">
+
+<!-- ==================================================== DASHBOARD -->
+<section id="v-dashboard">
+  <div class="kpis">
+    <div class="kpi"><div class="l">Batches Run</div><div class="v num">186</div><div class="s">100% of 186</div><div class="d"><span class="delta up">▲ 12.0%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+    <div class="kpi"><div class="l">Report Groups Run</div><div class="v num">42</div><div class="s">100% of 42</div><div class="d"><span class="delta up">▲ 5.0%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+    <div class="kpi alert"><div class="l">Batches w/ Issues</div><div class="v num">17</div><div class="s">9.1% of 186</div><div class="d"><span class="delta up">▲ 2.7%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+    <div class="kpi"><div class="l">Missed Rule Hits</div><div class="v num">126</div><div class="s">0.08% of Expected</div><div class="d"><span class="delta up">▲ 18.9%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+    <div class="kpi"><div class="l">Transformation Failures</div><div class="v num">31</div><div class="s">0.02% of Reportable</div><div class="d"><span class="delta up">▲ 24.0%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+    <div class="kpi"><div class="l">Reconciliation Issues</div><div class="v num">13</div><div class="s">Affects 9 Batches</div><div class="d"><span class="delta up">▲ 8.3%</span> <span class="hint">vs Jun 1 – Jun 30</span></div></div>
+  </div>
+
+  <div class="g3 mt12">
+    <div class="card">
+      <div class="card-h"><h3>Batch Health</h3></div>
+      <div class="pad" style="display:flex;gap:16px;align-items:center">
+        <div id="donutHealth" style="width:116px;flex:none"></div>
+        <div class="leg" style="flex:1">
+          <div class="row"><span class="sw" style="background:#16a34a"></span><span class="nm">Healthy</span><span class="vl">169</span><span class="pc">(90.9%)</span></div>
+          <div class="row"><span class="sw" style="background:#d97706"></span><span class="nm">Needs Attention</span><span class="vl">12</span><span class="pc">(6.5%)</span></div>
+          <div class="row"><span class="sw" style="background:#dc2626"></span><span class="nm">Critical</span><span class="vl">5</span><span class="pc">(2.7%)</span></div>
+        </div>
+      </div>
+      <div class="card-f"><span class="link" data-nav="group">View all batches →</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Issues by Type</h3><span class="n">(May have multiple issues per batch)</span></div>
+      <div class="pad blist" id="issueBars"></div>
+      <div class="card-f"><span class="link" data-nav="rulehits">View all issues →</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Operations Trend</h3><span class="n">(Daily)</span></div>
+      <div class="pad"><div id="opsTrend"></div></div>
+    </div>
+  </div>
+
+  <div class="g2w mt12">
+    <div class="card">
+      <div class="card-h"><h3>Report Group Health</h3><span class="n">(Sorted by Issues)</span></div>
+      <style>#rgBody td,#v-dashboard .g2w thead th{padding-left:9px;padding-right:9px;font-size:12px}</style>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr>
+            <th>Report Group</th><th class="r">Batches</th><th class="r">Issues</th>
+            <th class="r">Expected Hits</th><th class="r">Matched Hits</th><th class="r">Missed</th>
+            <th class="r">Transform Fail</th><th class="r">Last Batch</th><th>Status</th>
+          </tr></thead>
+          <tbody id="rgBody"></tbody>
+        </table>
+      </div>
+      <div class="card-f"><span class="link" data-nav="group">View all report groups →</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Top Problem Batches</h3></div>
+      <style>#pbBody td,#v-dashboard .g2w thead th{font-size:12px}</style>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr>
+            <th>Report Group</th><th class="r">Batch #</th><th class="r">Missed</th>
+            <th class="r">Transform Fail</th><th class="r">Recon</th><th class="r">Updated</th>
+          </tr></thead>
+          <tbody id="pbBody"></tbody>
+        </table>
+      </div>
+      <div class="card-f"><span class="link" data-nav="batch">View all problem batches →</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================== REPORT GROUP DETAIL -->
+<section id="v-group" class="hidden">
+  <div class="crumbs">
+    <a data-nav="dashboard">Dashboard</a><span class="sep">›</span>
+    <a data-nav="dashboard">Report Group Health</a><span class="sep">›</span>
+    <span>AUSTRALIA IFTI</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:4px">
+    <h2 style="font-size:19px">Report Group Detail — AUSTRALIA IFTI</h2>
+    <span class="badge b-red">Critical</span>
+    <button class="btn" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>Export</button>
+  </div>
+  <div class="hint" style="margin-bottom:13px">Period: Jul 1 – Jul 31, 2026 &nbsp;·&nbsp; Timezone: UTC</div>
+
+  <div class="strip">
+    <div class="c"><div class="l">Batches Run</div><div class="v num">31</div></div>
+    <div class="c"><div class="l">Healthy</div><div class="v num grn">29 <small>(93.5%)</small></div></div>
+    <div class="c"><div class="l">Batches w/ Issues</div><div class="v num red">2 <small>(6.5%)</small></div></div>
+    <div class="c"><div class="l">Expected Hits</div><div class="v num">264,382</div></div>
+    <div class="c"><div class="l">Matched Hits</div><div class="v num">264,329</div></div>
+    <div class="c"><div class="l">Missed Hits</div><div class="v num red">53 <small>(0.02%)</small></div></div>
+    <div class="c"><div class="l">Transform Failures</div><div class="v num red">7</div></div>
+    <div class="c"><div class="l">Reconciliation Issues</div><div class="v num amb">2</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on">Batch Summary</button>
+    <button class="tab">Rule Hit Summary</button>
+    <button class="tab">Issues by Type</button>
+    <button class="tab">Trend</button>
+    <button class="tab">Exceptions</button>
+  </div>
+
+  <div class="card" style="border-top-left-radius:0;border-top-right-radius:0;border-top:0">
+    <div style="overflow:auto">
+      <table>
+        <thead><tr>
+          <th class="r">Batch #</th><th>Completed On</th><th>Status</th>
+          <th class="r">Expected Hits</th><th class="r">Matched Hits</th><th class="r">Missed Hits</th>
+          <th class="r">Transform Failures</th><th class="r">Recon Issues</th><th class="r">Actions</th>
+        </tr></thead>
+        <tbody id="batchBody"></tbody>
+      </table>
+    </div>
+    <div class="card-f"><span class="link" data-nav="batch">View all 31 batches →</span></div>
+  </div>
+</section>
+
+<!-- ==================================================== BATCH INVESTIGATION -->
+<section id="v-batch" class="hidden">
+  <div class="crumbs">
+    <a data-nav="dashboard">Dashboard</a><span class="sep">›</span>
+    <a data-nav="group">Report Group Detail</a><span class="sep">›</span>
+    <span>Batch 137</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap">
+    <h2 style="font-size:19px">Batch Investigation — 137</h2>
+    <span class="badge b-red">Critical</span>
+  </div>
+  <div class="hint" style="margin:4px 0 0">Completed On: Jul 31, 2026 07:15 AM &nbsp;·&nbsp; AUSTRALIA IFTI</div>
+
+  <div class="tabs">
+    <button class="tab on">Overview</button>
+    <button class="tab" data-nav="rulehits">Rule Hits</button>
+    <button class="tab">Reconciliation</button>
+    <button class="tab">Transformation</button>
+    <button class="tab">Exceptions</button>
+    <button class="tab">Audit Log</button>
+  </div>
+
+  <div class="card" style="border-radius:0 0 var(--r) var(--r);border-top:0">
+    <div class="card-h" style="border-top:0"><h3>Batch Control Summary</h3></div>
+    <div class="pad g-half">
+      <div class="panel">
+        <div class="panel-h">Reporting Control</div>
+        <div class="kv"><span class="k">Expected Rule Hits</span><span class="v">8,742</span></div>
+        <div class="kv"><span class="k">Matched / Reported</span><span class="v">8,689</span></div>
+        <div class="kv"><span class="k">Missed Rule Hits</span><span class="v red tlink" data-nav="rulehits">53</span></div>
+        <div class="kv"><span class="k">Match Rate</span><span class="v">99.39%</span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">Transformation Control</div>
+        <div class="kv"><span class="k">Expected Reportable</span><span class="v">8,721</span></div>
+        <div class="kv"><span class="k">Actual Reportable</span><span class="v">8,689</span></div>
+        <div class="kv"><span class="k">Difference</span><span class="v amb">32</span></div>
+        <div class="kv"><span class="k">Expected Eligible</span><span class="v">8,689</span></div>
+        <div class="kv"><span class="k">Actual Eligible</span><span class="v">8,689</span></div>
+        <div class="kv"><span class="k">Transformed Successfully</span><span class="v">8,682</span></div>
+        <div class="kv"><span class="k">Transform Failures</span><span class="v red">7</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="g-half mt12">
+    <div class="card">
+      <div class="card-h"><h3>Batch Issue Breakdown</h3><span class="n">(53 Missed)</span></div>
+      <div class="pad" style="display:flex;gap:16px;align-items:center">
+        <div class="leg" style="flex:1">
+          <div class="row"><span class="sw" style="background:#dc2626"></span><span class="nm">Attempt / Feed Problem</span><span class="vl">21</span></div>
+          <div class="row"><span class="sw" style="background:#ea580c"></span><span class="nm">Transformation Failure</span><span class="vl">14</span></div>
+          <div class="row"><span class="sw" style="background:#d97706"></span><span class="nm">Excluded Unexpectedly</span><span class="vl">9</span></div>
+          <div class="row"><span class="sw" style="background:#eab308"></span><span class="nm">Reconciliation Gap</span><span class="vl">6</span></div>
+          <div class="row"><span class="sw" style="background:#94a3b8"></span><span class="nm">Other / Investigate</span><span class="vl">3</span></div>
+        </div>
+        <div id="donutIssue" style="width:124px;flex:none"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-h"><h3>Reconciliation Differences</h3></div>
+      <div style="overflow:auto">
+        <table>
+          <thead><tr><th>Control point</th><th class="r">Batch</th><th class="r">Source</th><th class="r">Difference</th></tr></thead>
+          <tbody>
+            <tr><td>Rule Hit Reporting</td><td class="r">8,742</td><td class="r">8,689</td><td class="r red">−53</td></tr>
+            <tr><td>Reportable Transactions</td><td class="r">8,721</td><td class="r">8,689</td><td class="r red">−32</td></tr>
+            <tr><td>Transformation Eligibility</td><td class="r">8,689</td><td class="r">8,689</td><td class="r zero">0</td></tr>
+            <tr><td>Transformation Disposition</td><td class="r">8,689</td><td class="r">8,682</td><td class="r red">−7</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card-f"><span class="link">View full reconciliation →</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================== RULE HITS MISSED -->
+<section id="v-rulehits" class="hidden">
+  <div class="crumbs">
+    <a data-nav="dashboard">Dashboard</a><span class="sep">›</span>
+    <a data-nav="group">Report Group Detail</a><span class="sep">›</span>
+    <a data-nav="batch">Batch 137</a><span class="sep">›</span>
+    <span>Rule Hits</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:13px">
+    <h2 style="font-size:19px">Rule Hits — Missed <span style="color:var(--muted);font-weight:500">(53)</span></h2>
+    <button class="btn" style="margin-left:auto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></svg>Download</button>
+  </div>
+
+  <div class="card">
+    <div class="pad" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--line2)">
+      <div style="min-width:170px"><label class="hint" style="display:block;margin-bottom:4px;font-weight:500">Filter by Rule</label><select class="ctl"><option>All</option><option>AU-IFTI-02</option><option>AU-IFTI-04</option><option>AU-IFTI-07</option></select></div>
+      <div style="min-width:170px"><label class="hint" style="display:block;margin-bottom:4px;font-weight:500">Filter by Reason</label><select class="ctl"><option>All</option><option>Attempt / Feed</option><option>Transform Failure</option><option>Excluded Unexpectedly</option></select></div>
+      <div style="flex:1;min-width:230px"><label class="hint" style="display:block;margin-bottom:4px;font-weight:500">Search</label><input class="ctl" placeholder="Search MTCN / External Txn Key / Galactic ID"></div>
+      <button class="btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.5V19l4 2v-8.5z"/></svg>Filters</button>
+    </div>
+    <div style="overflow:auto">
+      <table>
+        <thead><tr>
+          <th>Rule Code</th><th>Rule Name</th><th>MTCN</th><th>External Txn Key</th>
+          <th>Attempt ID</th><th>Galactic ID</th><th>Reason Category</th><th class="r">Action</th>
+        </tr></thead>
+        <tbody id="hitsBody"></tbody>
+      </table>
+    </div>
+    <div class="pad" style="display:flex;align-items:center;gap:8px;border-top:1px solid var(--line2)">
+      <div style="display:flex;gap:4px">
+        <button class="btn pri" style="padding:5px 10px">1</button>
+        <button class="btn" style="padding:5px 10px">2</button>
+        <button class="btn" style="padding:5px 10px">3</button>
+        <span style="align-self:center;color:var(--faint);padding:0 3px">…</span>
+        <button class="btn" style="padding:5px 10px">6</button>
+        <button class="btn" style="padding:5px 10px">›</button>
+      </div>
+      <span class="hint" style="margin-left:auto">Showing 1 to 10 of 53</span>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================== TRANSACTION JOURNEY -->
+<section id="v-journey" class="hidden">
+  <div class="crumbs">
+    <a data-nav="batch">Batch 137</a><span class="sep">›</span>
+    <a data-nav="rulehits">Rule Hits</a><span class="sep">›</span>
+    <span>MTCN1234568</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:13px">
+    <h2 style="font-size:19px">Transaction Journey — MTCN1234568</h2>
+    <span class="badge b-red">Missed</span>
+    <button class="btn" style="margin-left:auto" data-nav="rulehits">← Back to Missed List</button>
+  </div>
+
+  <div class="card">
+    <div class="pad" style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;border-bottom:1px solid var(--line2)">
+      <div><div class="hint">Report Group</div><div style="font-weight:600">AUSTRALIA IFTI</div></div>
+      <div><div class="hint">External Txn Key</div><div style="font-weight:600" class="mono">EXT0001234568</div></div>
+      <div><div class="hint">Attempt ID</div><div style="font-weight:600" class="mono">A-789124</div></div>
+      <div><div class="hint">Transaction Date</div><div style="font-weight:600">Jul 30, 2026 10:14 AM</div></div>
+      <div><div class="hint">Rule</div><div style="font-weight:600"><span class="tlink">AU-IFTI-04</span> High Risk Country</div></div>
+      <div><div class="hint">Galactic ID</div><div style="font-weight:600" class="mono">G-789124</div></div>
+      <div><div class="hint">Amount</div><div style="font-weight:600">25,000.00 AUD</div></div>
+      <div><div class="hint">Channel</div><div style="font-weight:600">Internet Banking</div></div>
+    </div>
+    <div class="card-h"><h3>Journey Stages</h3></div>
+    <div class="pad" style="padding-top:4px" id="journey"></div>
+  </div>
+</section>
+
+<!-- ==================================================== FAILURE DETAIL -->
+<section id="v-failure" class="hidden">
+  <div class="crumbs">
+    <a data-nav="journey">Transaction Journey</a><span class="sep">›</span>
+    <span>Transformation Failure</span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:11px;flex-wrap:wrap;margin-bottom:13px">
+    <h2 style="font-size:19px">Transformation Failure Detail</h2>
+    <span class="badge b-red">Failed</span>
+    <button class="btn" style="margin-left:auto" data-nav="journey">← Back to Journey</button>
+  </div>
+
+  <div class="tabs" style="margin-top:0">
+    <button class="tab on">Failure Overview</button>
+    <button class="tab">Input Data</button>
+    <button class="tab">Error Details</button>
+    <button class="tab">Retry History</button>
+    <button class="tab">Downstream Impact</button>
+    <button class="tab">Audit Log</button>
+  </div>
+
+  <div class="card" style="border-radius:0 0 var(--r) var(--r);border-top:0">
+    <div class="pad g-half">
+      <div class="panel">
+        <div class="panel-h warn">Failure Information</div>
+        <div class="kv"><span class="k">Failure Time</span><span class="v">Jul 30, 2026 07:10:48 AM</span></div>
+        <div class="kv"><span class="k">Failure Stage</span><span class="v">Transformation</span></div>
+        <div class="kv"><span class="k">Error Code</span><span class="v mono" style="font-size:12.5px">TRN-4001</span></div>
+        <div class="kv"><span class="k">Error Category</span><span class="v">Data Mapping</span></div>
+        <div class="kv"><span class="k">Error Message</span><span class="v" style="text-align:right;max-width:56%">Beneficiary name has invalid characters</span></div>
+        <div class="kv"><span class="k">Failing Component</span><span class="v">Transformation Service</span></div>
+        <div class="kv"><span class="k">Retry Status</span><span class="v"><span class="badge b-gry">Not Eligible</span></span></div>
+        <div class="kv"><span class="k">Impact</span><span class="v"><span class="badge b-red">Reported as Missed</span></span></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h">Input vs Expected</div>
+        <table>
+          <thead><tr><th>Field</th><th>Expected</th><th>Actual</th></tr></thead>
+          <tbody>
+            <tr><td>Beneficiary Name</td><td>Alphanumeric</td><td class="red mono" style="font-size:12.5px">ACME PTY LTD®</td></tr>
+            <tr><td>Country Code</td><td>AU</td><td>AU</td></tr>
+            <tr><td>Amount</td><td>Numeric</td><td>25,000.00</td></tr>
+            <tr><td>Currency</td><td>AUD</td><td>AUD</td></tr>
+            <tr><td>Transaction Type</td><td>FT</td><td>FT</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="pad" style="padding-top:0">
+      <div class="panel">
+        <div class="panel-h">Resolution / Notes</div>
+        <div class="kv"><span class="k">Root Cause</span><span class="v" style="text-align:right;max-width:60%">Invalid beneficiary name format from source</span></div>
+        <div class="kv"><span class="k">Resolved On</span><span class="v">Jul 31, 2026 09:25 AM</span></div>
+        <div class="kv"><span class="k">Action Taken</span><span class="v" style="text-align:right;max-width:60%">Data corrected in source and reprocessed</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+      </div><!-- /content -->
+
+      <!-- ================= FILTER RAIL ================= -->
+      <aside class="rail" id="rail">
+        <div class="rail-h"><h3>Filters</h3><span class="c">COLLAPSE ↑</span></div>
+
+        <div class="fgrp">
+          <label>Date Range</label>
+          <select class="ctl"><option>Custom</option><option>Preset</option></select>
+          <div class="frow" style="margin-top:8px">
+            <input class="ctl" value="07/01/2026">
+            <input class="ctl" value="07/31/2026">
+          </div>
+          <div class="quick">
+            <button>Today</button><button>Yesterday</button><button>Last 7 Days</button>
+            <button>Last 30 Days</button><button class="on">MTD</button><button>Last Month</button>
+          </div>
+        </div>
+
+        <div class="frow">
+          <div class="fgrp"><label>Report Group</label><select class="ctl"><option>All</option><option>AUSTRALIA IFTI</option><option>TURKEY IFTI</option><option>NORWAY IFTI</option><option>UK IFTI</option><option>SWITZERLAND IFTI</option></select></div>
+          <div class="fgrp"><label>Batch Status</label><select class="ctl"><option>All statuses (3)</option><option>Healthy</option><option>Needs Attention</option><option>Critical</option></select></div>
+        </div>
+        <div class="frow">
+          <div class="fgrp"><label>Batch Number</label><input class="ctl" placeholder="e.g. 137"></div>
+          <div class="fgrp"><label>Rule</label><select class="ctl"><option>All</option><option>AU-IFTI-02</option><option>AU-IFTI-04</option><option>AU-IFTI-07</option></select></div>
+        </div>
+        <div class="frow">
+          <div class="fgrp"><label>Issue Type</label><select class="ctl"><option>All</option><option>Reporting Miss</option><option>Transformation Failure</option><option>Reconciliation Diff</option><option>Eligibility Diff</option><option>Unexpected Exclusions</option></select></div>
+          <div class="fgrp"><label>Processing Stage</label><select class="ctl"><option>All</option><option>Filtration</option><option>Transaction Join</option><option>Transformation</option><option>Post Transformation</option><option>Reporting Load</option></select></div>
+        </div>
+        <div class="fgrp"><label>Transaction Key</label><input class="ctl" placeholder="MTCN / External Txn Key / Galactic ID"></div>
+        <div class="frow">
+          <div class="fgrp"><label>Source / Channel</label><select class="ctl"><option>All</option><option>Internet Banking</option><option>Branch</option><option>Agent</option></select></div>
+          <div class="fgrp"><label>Country / Corridor</label><select class="ctl"><option>All</option><option>AU → US</option><option>AU → TR</option></select></div>
+        </div>
+
+        <div class="rail-f">
+          <span class="link" style="align-self:center;margin-right:auto">Clear All</span>
+          <button class="btn">Cancel</button>
+          <button class="btn pri"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 3H2l8 9.5V19l4 2v-8.5z"/></svg>Apply Filters</button>
+        </div>
+      </aside>
+
+    </div><!-- /body-area -->
+  </div><!-- /main -->
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const fmt=n=>n.toLocaleString('en-US');
+
+/* ---------------- routing ---------------- */
+const TITLES={
+  dashboard:['IFTI Operations Dashboard','End-to-end monitoring of rule hits, reporting and transformation'],
+  group:['Report Group Health','Per-group batch performance and issue detail'],
+  batch:['Batch Investigation','Control totals, issue breakdown and reconciliation for a single batch'],
+  rulehits:['Rule Hits','Row-level detail for hits that did not reach the report'],
+  journey:['Transaction Journey','Stage-by-stage processing history for one transaction'],
+  failure:['Transformation Failure','Root cause, input comparison and resolution']
+};
+const NAVMAP={dashboard:0,batch:1,group:2,rulehits:4,journey:1,failure:5};
+function go(v){
+  $$('section[id^="v-"]').forEach(s=>s.classList.add('hidden'));
+  const el=$('#v-'+v); if(el) el.classList.remove('hidden');
+  $('#pgTitle').textContent=TITLES[v][0];
+  $('#pgSub').textContent=TITLES[v][1];
+  $$('#nav a').forEach(a=>a.classList.remove('on'));
+  const idx=NAVMAP[v]; if(idx!=null && $$('#nav a')[idx]) $$('#nav a')[idx].classList.add('on');
+  $('#rail').classList.toggle('hide', v!=='dashboard');
+  window.scrollTo({top:0});
+}
+$('#fBtn').addEventListener('click',()=>$('#rail').classList.toggle('hide'));
+$$('.rail-h .c, .rail-f .btn:not(.pri)').forEach(el=>el.addEventListener('click',()=>$('#rail').classList.add('hide')));
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-nav]');
+  if(t){ e.preventDefault(); go(t.dataset.nav); return; }
+  const tab=e.target.closest('.tab');
+  if(tab && !tab.dataset.nav){
+    tab.parentElement.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    tab.classList.add('on');
+  }
+});
+
+/* ---------------- donut ---------------- */
+function donut(el,data,center,label){
+  const R=54,r=34,cx=60,cy=60,total=data.reduce((a,b)=>a+b.v,0);
+  let a0=-Math.PI/2,paths='';
+  data.forEach(d=>{
+    const a1=a0+d.v/total*Math.PI*2, big=(a1-a0)>Math.PI?1:0;
+    const p=(rad,a)=>[cx+rad*Math.cos(a),cy+rad*Math.sin(a)];
+    const [x1,y1]=p(R,a0),[x2,y2]=p(R,a1),[x3,y3]=p(r,a1),[x4,y4]=p(r,a0);
+    paths+=`<path d="M${x1.toFixed(2)} ${y1.toFixed(2)} A${R} ${R} 0 ${big} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} L${x3.toFixed(2)} ${y3.toFixed(2)} A${r} ${r} 0 ${big} 0 ${x4.toFixed(2)} ${y4.toFixed(2)} Z" fill="${d.c}"/>`;
+    a0=a1;
+  });
+  el.innerHTML=`<svg viewBox="0 0 120 120" width="100%">${paths}
+    <text x="60" y="58" text-anchor="middle" font-size="21" font-weight="700" fill="#0f172a">${center}</text>
+    <text x="60" y="72" text-anchor="middle" font-size="8.5" fill="#64748b">${label}</text></svg>`;
+}
+donut($('#donutHealth'),[{v:169,c:'#16a34a'},{v:12,c:'#d97706'},{v:5,c:'#dc2626'}],'186','Total Batches');
+donut($('#donutIssue'),[{v:21,c:'#dc2626'},{v:14,c:'#ea580c'},{v:9,c:'#d97706'},{v:6,c:'#eab308'},{v:3,c:'#94a3b8'}],'53','Total');
+
+/* ---------------- issue bars ---------------- */
+const issues=[['Reporting Miss',8,'#dc2626'],['Transformation Failure',6,'#ea580c'],['Reconciliation Diff',5,'#d97706'],['Eligibility Diff',3,'#0ea5e9'],['Unexpected Exclusions',2,'#a855f7']];
+$('#issueBars').innerHTML=issues.map(([n,v,c])=>`
+  <div class="row"><span class="nm">${n}</span>
+  <span class="tr"><span class="fl" style="width:${v/8*100}%;background:${c}"></span></span>
+  <span class="vl">${v}</span></div>`).join('');
+
+/* ---------------- ops trend ---------------- */
+(function(){
+  const W=520,H=176,P={t:10,r:12,b:22,l:26},n=31;
+  const sd=(i,s)=>{const x=Math.sin(i*12.9898+s*78.233)*43758.5453;return x-Math.floor(x);};
+  const S=[
+    {name:'Batches Run',c:'#2563eb',d:Array.from({length:n},(_,i)=>Math.round(18+sd(i,1)*8))},
+    {name:'Batches w/ Issues',c:'#dc2626',d:Array.from({length:n},(_,i)=>Math.round(4+sd(i,2)*6))},
+    {name:'Missed Hits',c:'#16a34a',d:Array.from({length:n},(_,i)=>Math.round(2+sd(i,3)*3))},
+    {name:'Transform Failures',c:'#f59e0b',d:Array.from({length:n},(_,i)=>Math.round(1+sd(i,4)*2))}
+  ];
+  const max=30,X=i=>P.l+i*(W-P.l-P.r)/(n-1),Y=v=>P.t+(max-v)/max*(H-P.t-P.b);
+  let g='';
+  [0,10,20,30].forEach(v=>{
+    g+=`<line x1="${P.l}" y1="${Y(v).toFixed(1)}" x2="${W-P.r}" y2="${Y(v).toFixed(1)}" stroke="#f1f5f9"/>`;
+    g+=`<text x="${P.l-6}" y="${(Y(v)+3.5).toFixed(1)}" text-anchor="end" font-size="9" fill="#94a3b8">${v}</text>`;
+  });
+  let p='';
+  S.forEach(s=>{
+    p+=`<path d="${s.d.map((v,i)=>(i?'L':'M')+X(i).toFixed(1)+' '+Y(v).toFixed(1)).join(' ')}" fill="none" stroke="${s.c}" stroke-width="1.6"/>`;
+    p+=s.d.map((v,i)=>i%2?'':`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2" fill="${s.c}"/>`).join('');
+  });
+  let tk='';
+  [0,7,14,21,30].forEach(i=>{
+    const a=i===0?'start':(i===30?'end':'middle');
+    tk+=`<text x="${X(i).toFixed(1)}" y="${H-6}" text-anchor="${a}" font-size="9" fill="#94a3b8">Jul ${i+1}</text>`;
+  });
+  $('#opsTrend').innerHTML=
+    `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:7px">${S.map(s=>
+      `<span style="display:inline-flex;align-items:center;gap:5px;font-size:11px;color:#64748b"><span style="width:8px;height:8px;border-radius:50%;background:${s.c}"></span>${s.name}</span>`).join('')}</div>`+
+    `<svg viewBox="0 0 ${W} ${H}" width="100%">${g}${p}${tk}</svg>`;
+})();
+
+/* ---------------- report group table ---------------- */
+const ST={Critical:'b-red','Needs Attention':'b-amb',Healthy:'b-grn'};
+const rgs=[
+  ['AUSTRALIA IFTI',31,29,2,264382,264329,53,7,137,'Critical'],
+  ['TURKEY IFTI',22,21,1,171400,171372,28,6,142,'Needs Attention'],
+  ['NORWAY IFTI',4,4,0,63200,63200,0,0,56,'Healthy'],
+  ['UK IFTI',21,20,1,152180,152170,10,2,121,'Needs Attention'],
+  ['SWITZERLAND IFTI',8,7,1,41650,41640,10,1,73,'Needs Attention']
+];
+$('#rgBody').innerHTML=rgs.map(r=>`
+  <tr class="click" data-nav="group">
+    <td><span class="tlink">${r[0]}</span></td>
+    <td class="r">${r[1]}</td>
+    <td class="r ${r[3]?'red':'zero'}">${r[3]}</td>
+    <td class="r">${fmt(r[4])}</td><td class="r">${fmt(r[5])}</td>
+    <td class="r ${r[6]?'red':'zero'}">${r[6]}</td>
+    <td class="r ${r[7]?'amb':'zero'}">${r[7]}</td>
+    <td class="r">${r[8]}</td>
+    <td><span class="badge ${ST[r[9]]}">${r[9]==='Needs Attention'?'Attention':r[9]}</span></td>
+  </tr>`).join('');
+
+const pbs=[
+  ['AUSTRALIA IFTI',137,53,7,2,'Jul 31, 07:15'],
+  ['TURKEY IFTI',142,28,6,1,'Jul 31, 06:50'],
+  ['AUSTRALIA IFTI',136,36,6,1,'Jul 30, 07:10'],
+  ['UK IFTI',121,10,2,1,'Jul 30, 06:05'],
+  ['SWITZERLAND IFTI',73,10,1,1,'Jul 29, 05:40']
+];
+$('#pbBody').innerHTML=pbs.map(r=>`
+  <tr class="click" data-nav="batch">
+    <td><span class="tlink">${r[0]}</span></td>
+    <td class="r">${r[1]}</td><td class="r red">${r[2]}</td>
+    <td class="r amb">${r[3]}</td><td class="r amb">${r[4]}</td>
+    <td class="r" style="color:var(--muted)">${r[5]}</td>
+  </tr>`).join('');
+
+/* ---------------- batch summary ---------------- */
+const EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+const batches=[
+  [137,'Jul 31, 2026 07:15 AM','Critical',8742,8689,53,7,2],
+  [136,'Jul 30, 2026 07:10 AM','Needs Attention',8215,8179,36,6,1],
+  [135,'Jul 29, 2026 07:12 AM','Healthy',8030,8030,0,0,0],
+  [134,'Jul 28, 2026 07:11 AM','Healthy',7812,7812,0,0,0],
+  [133,'Jul 27, 2026 07:09 AM','Needs Attention',7654,7622,32,2,1]
+];
+$('#batchBody').innerHTML=batches.map(b=>`
+  <tr class="click" data-nav="batch">
+    <td class="r"><span class="tlink">${b[0]}</span></td>
+    <td>${b[1]}</td>
+    <td><span class="badge ${ST[b[2]]}">${b[2]}</span></td>
+    <td class="r">${fmt(b[3])}</td><td class="r">${fmt(b[4])}</td>
+    <td class="r ${b[5]?'red':'zero'}">${b[5]}</td>
+    <td class="r ${b[6]?'amb':'zero'}">${b[6]}</td>
+    <td class="r ${b[7]?'amb':'zero'}">${b[7]}</td>
+    <td class="r"><span class="eye" data-nav="batch">${EYE}</span></td>
+  </tr>`).join('');
+
+/* ---------------- missed rule hits ---------------- */
+const RC={'Attempt / Feed':'b-red','Transform Failure':'b-amb','Excluded Unexpectedly':'b-blu'};
+const hits=[
+  ['AU-IFTI-02','Structuring (Smurfing)','MTCN1234567','EXT0001234567','A-789123','G-789123','Attempt / Feed'],
+  ['AU-IFTI-04','High Risk Country','MTCN1234568','EXT0001234568','A-789124','G-789124','Transform Failure'],
+  ['AU-IFTI-02','Structuring (Smurfing)','MTCN1234569','EXT0001234569','A-789125','G-789125','Attempt / Feed'],
+  ['AU-IFTI-07','Sanctions Screening','MTCN1234570','EXT0001234570','A-789126','G-789126','Excluded Unexpectedly'],
+  ['AU-IFTI-02','Structuring (Smurfing)','MTCN1234571','EXT0001234571','A-789127','G-789127','Attempt / Feed'],
+  ['AU-IFTI-04','High Risk Country','MTCN1234572','EXT0001234572','A-789128','G-789128','Transform Failure'],
+  ['AU-IFTI-09','Rapid Movement of Funds','MTCN1234573','EXT0001234573','A-789129','G-789129','Attempt / Feed'],
+  ['AU-IFTI-02','Structuring (Smurfing)','MTCN1234574','EXT0001234574','A-789130','G-789130','Excluded Unexpectedly'],
+  ['AU-IFTI-07','Sanctions Screening','MTCN1234575','EXT0001234575','A-789131','G-789131','Attempt / Feed'],
+  ['AU-IFTI-04','High Risk Country','MTCN1234576','EXT0001234576','A-789132','G-789132','Transform Failure']
+];
+$('#hitsBody').innerHTML=hits.map(h=>`
+  <tr class="click" data-nav="journey">
+    <td><span class="tlink">${h[0]}</span></td>
+    <td style="color:var(--ink2)">${h[1]}</td>
+    <td class="mono">${h[2]}</td><td class="mono">${h[3]}</td>
+    <td class="mono">${h[4]}</td><td class="mono">${h[5]}</td>
+    <td><span class="badge ${RC[h[6]]}">${h[6]}</span></td>
+    <td class="r"><span class="eye" data-nav="journey">${EYE}</span></td>
+  </tr>`).join('');
+
+/* ---------------- journey ---------------- */
+const CHEV='<svg class="chev" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>';
+const stages=[
+  [1,'Filtration','SUCCESS','Jul 30, 07:10:45 AM','Passed all filters','ok'],
+  [2,'Transaction Join','SUCCESS','Jul 30, 07:10:46 AM','Join successful with source system','ok'],
+  [3,'Transformation','FAILED','Jul 30, 07:10:48 AM','Invalid format in Beneficiary Name','bad'],
+  [4,'Post Transformation','SKIPPED','—','Skipped due to previous failure','skip'],
+  [5,'Reporting Load','SKIPPED','—','Not processed','skip']
+];
+const SB={ok:'b-grn',bad:'b-red',skip:'b-gry'};
+$('#journey').innerHTML=stages.map(s=>`
+  <div class="jrow ${s[5]==='bad'?'act':''}" ${s[5]==='bad'?'data-nav="failure"':''}>
+    <div class="jdot jd-${s[5]}">${s[5]==='ok'?'✓':s[5]==='bad'?'!':''}</div>
+    <div class="jbody">
+      <div class="jtitle">
+        <span class="nm">${s[0]}. ${s[1]}</span>
+        <span class="badge ${SB[s[5]]}">${s[2]}</span>
+        <span class="jtime">${s[3]}</span>
+      </div>
+      ${s[5]==='bad'
+        ? `<div class="jmsg bad">${s[4]}</div>`
+        : `<div class="jmsg">${s[4]}</div>`}
+    </div>
+    ${s[5]==='bad'?CHEV:''}
+  </div>`).join('');
+})();
+</script>
+</body>
+</html>
