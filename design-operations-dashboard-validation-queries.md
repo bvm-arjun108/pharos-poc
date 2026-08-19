@@ -776,25 +776,57 @@ WITH scoped AS (
     WHERE created_timestamp >= TIMESTAMP '2026-06-01 00:00:00'
       AND created_timestamp <  TIMESTAMP '2026-07-01 00:00:00'
 )
+
 SELECT jsonb_build_object(
     'query_id', 'VAL_10_RECONCILIATION_GRAINS',
-    'total_rows', COUNT(*),
-    'reconciliation_type_counts', (
-        SELECT COALESCE(jsonb_object_agg(type_value, cnt), '{}'::jsonb)
+
+    'total_rows',
+    COUNT(*),
+
+    'distinct_report_groups',
+    COUNT(DISTINCT rpt_grp_id),
+
+    'distinct_runs',
+    COUNT(DISTINCT (rpt_grp_id, run_date, seq_no)),
+
+    'report_group_counts',
+    (
+        SELECT COALESCE(
+            jsonb_object_agg(report_group, cnt),
+            '{}'::jsonb
+        )
         FROM (
-            SELECT COALESCE(reconciliation_type, '<NULL>') AS type_value,
-                   COUNT(*) AS cnt
-            FROM scoped GROUP BY COALESCE(reconciliation_type, '<NULL>')
+            SELECT
+                COALESCE(rpt_grp_name, rpt_grp_id::text) AS report_group,
+                COUNT(*) AS cnt
+            FROM scoped
+            GROUP BY COALESCE(rpt_grp_name, rpt_grp_id::text)
         ) x
     ),
-    'balanced_rows', COUNT(*) FILTER (
-        WHERE COALESCE(expected_count, 0)
-            = COALESCE(matched_count, 0) + COALESCE(missed_count, 0)
+
+    'balanced_rows',
+    COUNT(*) FILTER (
+        WHERE COALESCE(distinct_rule_hits_count_iwra, 0)
+            = COALESCE(distinct_rule_hits_count_pharos, 0)
+            + COALESCE(missed_rule_hits_count_pharos, 0)
     ),
-    'unbalanced_rows', COUNT(*) FILTER (
-        WHERE COALESCE(expected_count, 0)
-           <> COALESCE(matched_count, 0) + COALESCE(missed_count, 0)
-    )
+
+    'unbalanced_rows',
+    COUNT(*) FILTER (
+        WHERE COALESCE(distinct_rule_hits_count_iwra, 0)
+            <> COALESCE(distinct_rule_hits_count_pharos, 0)
+             + COALESCE(missed_rule_hits_count_pharos, 0)
+    ),
+
+    'expected_rule_hits',
+    COALESCE(SUM(distinct_rule_hits_count_iwra), 0),
+
+    'matched_rule_hits',
+    COALESCE(SUM(distinct_rule_hits_count_pharos), 0),
+
+    'missed_rule_hits',
+    COALESCE(SUM(missed_rule_hits_count_pharos), 0)
+
 ) AS result
 FROM scoped;
 ```
