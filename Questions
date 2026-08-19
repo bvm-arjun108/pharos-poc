@@ -1,0 +1,25 @@
+Exact semantics of the “future reporting” buckets.
+We now know the code path and that the counts are first-class transformer metrics, but I still want the exact filter predicates translated cleanly into SQL before making those counts clickable. In other words: we know reporting_period_future_reporting_txn = 445 is real; the remaining question is the exact row-level SQL that returns those 445 records.
+
+Exact row-level retrieval for “already reported.”
+The code clearly identifies and counts already-reported rule hits and writes journey evidence with an already-reported exclusion reason. I am confident the drill-down is possible. What remains is to derive the production SQL that reproduces the exact DataFrame logic 1:1.
+
+Exact row-level retrieval for missing attempts.
+Same situation: the code gives us the population and reason (ATTEMPT_NOT_RECEIVED / transaction-join error behavior), so the concept is confirmed. The remaining work is translating the Spark/DataFrame logic into SQL that returns the exact same set.
+
+Ownership and refresh semantics of rule_hit_reconciliation.
+We know this repo does not write it. We have validated its aggregate equation and can consume it safely. What we do not know yet is:
+- which service/job owns it,
+- refresh cadence,
+- exact timing semantics of run_date vs created_timestamp vs business selection dates,
+- whether row-level missed-hit evidence exists elsewhere.
+For Phase 1, that only affects how we label the coverage section and its date filter.
+
+Final downstream reporting status.
+We now know this transformer sets is_reported=false and does not set it to true. So the unresolved part is simply which downstream component finalizes it. This does not block Phase 1; we just must not imply that the transformer owns final submission status.
+
+Whether record_transformation_journey is enough for every transaction drill-down.
+We know it is latest-state/upserted evidence, not event history. What we do not know is whether every operational exception always leaves a journey row. The UI therefore needs a graceful “No journey evidence available” state rather than assuming coverage is universal.
+
+Report-group reference metadata.
+We have rpt_grp_id and rpt_grp_name, but if we want country/jurisdiction, owner, active/inactive status, business owner, etc., we should confirm the authoritative reference table. That is optional for Phase 1.
