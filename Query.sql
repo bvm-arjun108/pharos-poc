@@ -1072,3 +1072,235 @@ SELECT jsonb_build_object(
 ) AS validation_result
 
 FROM bridge_test;
+
+
+==========================================================================
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+transformation_batches AS (
+    SELECT DISTINCT
+        r.rpt_grp_id,
+        r.rpt_grp_name,
+        r.batch_id
+    FROM report_transformation_reconciliation r
+    CROSS JOIN params p
+    WHERE r.created_timestamp >= p.start_date
+      AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+      AND r.batch_id IS NOT NULL
+),
+
+efile_matches AS (
+    SELECT
+        tb.rpt_grp_id,
+        tb.rpt_grp_name,
+        tb.batch_id,
+
+        COUNT(rh.*) AS rule_hit_rows,
+        COUNT(DISTINCT rh.rule_id) AS distinct_rules,
+        COUNT(DISTINCT rh.mtcn) AS distinct_mtcns
+
+    FROM transformation_batches tb
+
+    LEFT JOIN rule_hit rh
+      ON rh.rpt_grp_id = tb.rpt_grp_id
+     AND rh.efile_batch_id = tb.batch_id
+
+    GROUP BY
+        tb.rpt_grp_id,
+        tb.rpt_grp_name,
+        tb.batch_id
+),
+
+audit_matches AS (
+    SELECT
+        tb.rpt_grp_id,
+        tb.batch_id,
+
+        COUNT(a.*) AS exclusion_rows
+
+    FROM transformation_batches tb
+
+    LEFT JOIN rule_hit_exclusion_audit a
+      ON a.rpt_grp_id = tb.rpt_grp_id
+     AND a.processing_batch_id = tb.batch_id
+
+    GROUP BY
+        tb.rpt_grp_id,
+        tb.batch_id
+),
+
+combined AS (
+    SELECT
+        e.rpt_grp_id,
+        e.rpt_grp_name,
+        e.batch_id,
+
+        e.rule_hit_rows,
+        e.distinct_rules,
+        e.distinct_mtcns,
+
+        COALESCE(a.exclusion_rows, 0) AS exclusion_rows
+
+    FROM efile_matches e
+
+    LEFT JOIN audit_matches a
+      ON a.rpt_grp_id = e.rpt_grp_id
+     AND a.batch_id = e.batch_id
+),
+
+report_group_summary AS (
+    SELECT
+        rpt_grp_id,
+        rpt_grp_name,
+
+        COUNT(*) AS transformation_batches,
+
+        COUNT(*) FILTER (
+            WHERE rule_hit_rows > 0
+        ) AS batches_with_rule_hits,
+
+        COUNT(*) FILTER (
+            WHERE exclusion_rows > 0
+        ) AS batches_with_exclusions,
+
+        SUM(rule_hit_rows) AS total_rule_hit_rows,
+        SUM(distinct_rules) AS total_distinct_rules,
+        SUM(distinct_mtcns) AS total_distinct_mtcns,
+        SUM(exclusion_rows) AS total_exclusion_rows
+
+    FROM combined
+
+    GROUP BY
+        rpt_grp_id,
+        rpt_grp_name
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_03B_BATCH_BRIDGE_BY_REPORT_GROUP',
+
+    'period',
+        jsonb_build_object(
+            'start_date', '2026-08-01',
+            'end_date', '2026-08-31'
+        ),
+
+    'summary',
+        jsonb_build_object(
+
+            'transformation_batches',
+                (SELECT COUNT(*) FROM combined),
+
+            'batches_with_rule_hit_efile_match',
+                (
+                    SELECT COUNT(*)
+                    FROM combined
+                    WHERE rule_hit_rows > 0
+                ),
+
+            'batches_with_exclusion_processing_match',
+                (
+                    SELECT COUNT(*)
+                    FROM combined
+                    WHERE exclusion_rows > 0
+                ),
+
+            'batches_with_both',
+                (
+                    SELECT COUNT(*)
+                    FROM combined
+                    WHERE rule_hit_rows > 0
+                      AND exclusion_rows > 0
+                )
+        ),
+
+    'report_groups',
+        COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+
+                        'rpt_grp_id',
+                            rpt_grp_id,
+
+                        'rpt_grp_name',
+                            rpt_grp_name,
+
+                        'transformation_batches',
+                            transformation_batches,
+
+                        'batches_with_rule_hits',
+                            batches_with_rule_hits,
+
+                        'batches_with_exclusions',
+                            batches_with_exclusions,
+
+                        'total_rule_hit_rows',
+                            total_rule_hit_rows,
+
+                        'total_distinct_rules',
+                            total_distinct_rules,
+
+                        'total_distinct_mtcns',
+                            total_distinct_mtcns,
+
+                        'total_exclusion_rows',
+                            total_exclusion_rows
+
+                    )
+                    ORDER BY batches_with_rule_hits DESC
+                )
+                FROM report_group_summary
+            ),
+            '[]'::jsonb
+        ),
+
+    'matched_batch_samples',
+        COALESCE(
+            (
+                SELECT jsonb_agg(
+                    jsonb_build_object(
+
+                        'rpt_grp_id',
+                            rpt_grp_id,
+
+                        'rpt_grp_name',
+                            rpt_grp_name,
+
+                        'batch_id',
+                            batch_id,
+
+                        'rule_hit_rows',
+                            rule_hit_rows,
+
+                        'distinct_rules',
+                            distinct_rules,
+
+                        'distinct_mtcns',
+                            distinct_mtcns,
+
+                        'exclusion_rows',
+                            exclusion_rows
+                    )
+                    ORDER BY rule_hit_rows DESC
+                )
+
+                FROM (
+                    SELECT *
+                    FROM combined
+                    WHERE rule_hit_rows > 0
+                       OR exclusion_rows > 0
+                    ORDER BY rule_hit_rows DESC
+                    LIMIT 50
+                ) x
+            ),
+            '[]'::jsonb
+        )
+
+) AS validation_result;
