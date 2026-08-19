@@ -634,3 +634,115 @@ FROM comparison;
 
 
 ========================================================================================================================================================================================
+
+
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+latest AS (
+    SELECT *
+    FROM (
+        SELECT
+            r.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.batch_id, r.rpt_grp_id
+                ORDER BY r.seq_no DESC, r.modified_timestamp DESC
+            ) AS rn
+        FROM report_transformation_reconciliation r
+        CROSS JOIN params p
+        WHERE r.created_timestamp >= p.start_date
+          AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+    ) x
+    WHERE rn = 1
+),
+
+checks AS (
+    SELECT
+        *,
+
+        COALESCE(txn_selected,0)
+        - (
+            COALESCE(excluded_txn,0)
+          + COALESCE(txn_missing_attempt_count,0)
+          + COALESCE(already_reported_count,0)
+          + COALESCE(expected_reportable_txn,0)
+        ) AS selection_balance_diff
+
+    FROM latest
+),
+
+unbalanced AS (
+    SELECT *
+    FROM checks
+    WHERE selection_balance_diff <> 0
+)
+
+SELECT jsonb_build_object(
+
+    'query_id', 'VALIDATION_02B_SELECTION_BALANCE_ANALYSIS',
+
+    'period', jsonb_build_object(
+        'start_date', '2026-08-01',
+        'end_date', '2026-08-31'
+    ),
+
+    'summary', jsonb_build_object(
+        'unbalanced_batches', COUNT(*),
+        'max_selection_difference', MAX(ABS(selection_balance_diff))
+    ),
+
+    'candidate_field_totals', jsonb_build_object(
+        'txn_simulated', SUM(COALESCE(txn_simulated,0)),
+        'lookback_txn', SUM(COALESCE(lookback_txn,0)),
+        'lookback_future_reporting_txn', SUM(COALESCE(lookback_future_reporting_txn,0)),
+        'lookback_actual_txn', SUM(COALESCE(lookback_actual_txn,0)),
+        'reporting_period_txn', SUM(COALESCE(reporting_period_txn,0)),
+        'reporting_period_future_reporting_txn', SUM(COALESCE(reporting_period_future_reporting_txn,0)),
+        'reporting_period_actual_txn', SUM(COALESCE(reporting_period_actual_txn,0)),
+        'activity_selected', SUM(COALESCE(activity_selected,0)),
+        'activity_missing', SUM(COALESCE(activity_missing,0)),
+        'activity_simulated', SUM(COALESCE(activity_simulated,0))
+    ),
+
+    'top_unbalanced_batches',
+    COALESCE(
+        jsonb_agg(
+            jsonb_build_object(
+                'batch_id', batch_id,
+                'rpt_grp_id', rpt_grp_id,
+                'rpt_grp_name', rpt_grp_name,
+                'selection_balance_diff', selection_balance_diff,
+                'txn_selected', txn_selected,
+                'txn_simulated', txn_simulated,
+                'excluded_txn', excluded_txn,
+                'txn_missing_attempt_count', txn_missing_attempt_count,
+                'already_reported_count', already_reported_count,
+                'expected_reportable_txn', expected_reportable_txn,
+                'lookback_txn', lookback_txn,
+                'lookback_future_reporting_txn', lookback_future_reporting_txn,
+                'lookback_actual_txn', lookback_actual_txn,
+                'reporting_period_txn', reporting_period_txn,
+                'reporting_period_future_reporting_txn', reporting_period_future_reporting_txn,
+                'reporting_period_actual_txn', reporting_period_actual_txn,
+                'activity_selected', activity_selected,
+                'activity_missing', activity_missing,
+                'activity_simulated', activity_simulated
+            )
+            ORDER BY ABS(selection_balance_diff) DESC
+        ),
+        '[]'::jsonb
+    )
+
+) AS validation_result
+
+FROM (
+    SELECT *
+    FROM unbalanced
+    ORDER BY ABS(selection_balance_diff) DESC
+    LIMIT 50
+) x;
+
