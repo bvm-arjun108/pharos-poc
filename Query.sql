@@ -746,3 +746,211 @@ FROM (
     LIMIT 50
 ) x;
 
+
+
+
+=======================================================================================================================================================================
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+latest AS (
+    SELECT *
+    FROM (
+        SELECT
+            r.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.batch_id, r.rpt_grp_id
+                ORDER BY r.seq_no DESC, r.modified_timestamp DESC
+            ) AS rn
+        FROM report_transformation_reconciliation r
+        CROSS JOIN params p
+        WHERE r.created_timestamp >= p.start_date
+          AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+    ) x
+    WHERE rn = 1
+),
+
+checks AS (
+    SELECT
+        *,
+
+        /* A — expected reportable vs activity selected */
+        COALESCE(expected_reportable_txn,0)
+        - COALESCE(activity_selected,0)
+            AS expected_vs_activity_selected_diff,
+
+        /* B — activity-selected composition */
+        COALESCE(activity_selected,0)
+        - (
+            COALESCE(lookback_txn,0)
+          + COALESCE(reporting_period_txn,0)
+          + COALESCE(activity_simulated,0)
+        ) AS activity_selected_balance_diff,
+
+        /* C — lookback composition */
+        COALESCE(lookback_txn,0)
+        - (
+            COALESCE(lookback_actual_txn,0)
+          + COALESCE(lookback_future_reporting_txn,0)
+        ) AS lookback_balance_diff,
+
+        /* D — reporting-period composition */
+        COALESCE(reporting_period_txn,0)
+        - (
+            COALESCE(reporting_period_actual_txn,0)
+          + COALESCE(reporting_period_future_reporting_txn,0)
+        ) AS reporting_period_balance_diff,
+
+        /* E — transformation disposition */
+        COALESCE(actual_activity_eligible_for_transformation,0)
+        - (
+            COALESCE(activity_transformed,0)
+          + COALESCE(activity_transformation_failed,0)
+          + COALESCE(duplicate_transformation,0)
+        ) AS transformation_balance_diff
+
+    FROM latest
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_02C_CONTROL_RELATIONSHIPS',
+
+    'period',
+        jsonb_build_object(
+            'start_date', '2026-08-01',
+            'end_date',   '2026-08-31'
+        ),
+
+    'summary',
+        jsonb_build_object(
+
+            'total_batches',
+                COUNT(*),
+
+            'expected_equals_activity_selected',
+                COUNT(*) FILTER (
+                    WHERE expected_vs_activity_selected_diff = 0
+                ),
+
+            'expected_not_equal_activity_selected',
+                COUNT(*) FILTER (
+                    WHERE expected_vs_activity_selected_diff <> 0
+                ),
+
+            'activity_selected_balanced',
+                COUNT(*) FILTER (
+                    WHERE activity_selected_balance_diff = 0
+                ),
+
+            'activity_selected_unbalanced',
+                COUNT(*) FILTER (
+                    WHERE activity_selected_balance_diff <> 0
+                ),
+
+            'lookback_balanced',
+                COUNT(*) FILTER (
+                    WHERE lookback_balance_diff = 0
+                ),
+
+            'lookback_unbalanced',
+                COUNT(*) FILTER (
+                    WHERE lookback_balance_diff <> 0
+                ),
+
+            'reporting_period_balanced',
+                COUNT(*) FILTER (
+                    WHERE reporting_period_balance_diff = 0
+                ),
+
+            'reporting_period_unbalanced',
+                COUNT(*) FILTER (
+                    WHERE reporting_period_balance_diff <> 0
+                ),
+
+            'transformation_balanced',
+                COUNT(*) FILTER (
+                    WHERE transformation_balance_diff = 0
+                ),
+
+            'transformation_unbalanced',
+                COUNT(*) FILTER (
+                    WHERE transformation_balance_diff <> 0
+                )
+        ),
+
+    'max_variances',
+        jsonb_build_object(
+
+            'expected_vs_activity_selected',
+                MAX(ABS(expected_vs_activity_selected_diff)),
+
+            'activity_selected',
+                MAX(ABS(activity_selected_balance_diff)),
+
+            'lookback',
+                MAX(ABS(lookback_balance_diff)),
+
+            'reporting_period',
+                MAX(ABS(reporting_period_balance_diff)),
+
+            'transformation',
+                MAX(ABS(transformation_balance_diff))
+        ),
+
+    'sample_exceptions',
+        COALESCE(
+            jsonb_agg(
+                jsonb_build_object(
+                    'batch_id', batch_id,
+                    'rpt_grp_id', rpt_grp_id,
+                    'rpt_grp_name', rpt_grp_name,
+
+                    'expected_reportable_txn',
+                        expected_reportable_txn,
+
+                    'activity_selected',
+                        activity_selected,
+
+                    'expected_vs_activity_selected_diff',
+                        expected_vs_activity_selected_diff,
+
+                    'lookback_txn',
+                        lookback_txn,
+
+                    'reporting_period_txn',
+                        reporting_period_txn,
+
+                    'activity_selected_balance_diff',
+                        activity_selected_balance_diff,
+
+                    'lookback_balance_diff',
+                        lookback_balance_diff,
+
+                    'reporting_period_balance_diff',
+                        reporting_period_balance_diff,
+
+                    'transformation_balance_diff',
+                        transformation_balance_diff
+                )
+                ORDER BY
+                    ABS(activity_selected_balance_diff) DESC,
+                    ABS(expected_vs_activity_selected_diff) DESC
+            ) FILTER (
+                WHERE expected_vs_activity_selected_diff <> 0
+                   OR activity_selected_balance_diff <> 0
+                   OR lookback_balance_diff <> 0
+                   OR reporting_period_balance_diff <> 0
+                   OR transformation_balance_diff <> 0
+            ),
+            '[]'::jsonb
+        )
+
+) AS validation_result
+
+FROM checks;
