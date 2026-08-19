@@ -930,183 +930,128 @@ unprocessed_scope AS (
       AND u.created_timestamp <  p.to_ts
 )
 SELECT jsonb_build_object(
-    'query_id', 'VAL_13_RECON_DETAIL_PROFILE',
+    'query_id', 'VAL_13_RECON_DETAIL_POPULATIONS',
 
-    'rule_hit_reconciliation_log',
-    jsonb_build_object(
+    'reconciliation_log', jsonb_build_object(
         'rows', (SELECT COUNT(*) FROM log_scope),
-        'distinct_report_groups',
-            (SELECT COUNT(DISTINCT rpt_grp_id) FROM log_scope),
-        'distinct_runs',
-            (SELECT COUNT(DISTINCT (rpt_grp_id, run_date, seq_no)) FROM log_scope),
-        'min_created_timestamp',
-            (SELECT MIN(created_timestamp) FROM log_scope),
-        'max_created_timestamp',
-            (SELECT MAX(created_timestamp) FROM log_scope),
-
-        'is_processed_counts',
-        (
-            SELECT COALESCE(
-                jsonb_object_agg(flag_value, cnt),
-                '{}'::jsonb
-            )
-            FROM (
-                SELECT
-                    COALESCE(is_processed::text, '<NULL>') AS flag_value,
-                    COUNT(*) AS cnt
-                FROM log_scope
-                GROUP BY COALESCE(is_processed::text, '<NULL>')
-            ) x
+        'distinct_runs', (
+            SELECT COUNT(DISTINCT (run_date, seq_no, rpt_grp_id))
+            FROM log_scope
         ),
-
-        'is_reported_counts',
-        (
-            SELECT COALESCE(
-                jsonb_object_agg(flag_value, cnt),
-                '{}'::jsonb
-            )
-            FROM (
-                SELECT
-                    COALESCE(is_reported::text, '<NULL>') AS flag_value,
-                    COUNT(*) AS cnt
-                FROM log_scope
-                GROUP BY COALESCE(is_reported::text, '<NULL>')
-            ) x
+        'distinct_report_groups', (
+            SELECT COUNT(DISTINCT rpt_grp_id)
+            FROM log_scope
         ),
-
-        'status_counts',
-        (
+        'processed_true', (
+            SELECT COUNT(*) FROM log_scope WHERE is_processed IS TRUE
+        ),
+        'processed_false', (
+            SELECT COUNT(*) FROM log_scope WHERE is_processed IS FALSE
+        ),
+        'processed_null', (
+            SELECT COUNT(*) FROM log_scope WHERE is_processed IS NULL
+        ),
+        'reported_true', (
+            SELECT COUNT(*) FROM log_scope WHERE is_reported IS TRUE
+        ),
+        'reported_false', (
+            SELECT COUNT(*) FROM log_scope WHERE is_reported IS FALSE
+        ),
+        'reported_null', (
+            SELECT COUNT(*) FROM log_scope WHERE is_reported IS NULL
+        ),
+        'status_counts', (
             SELECT COALESCE(
                 jsonb_object_agg(status_value, cnt),
                 '{}'::jsonb
             )
             FROM (
                 SELECT
-                    COALESCE(status::text, '<NULL>') AS status_value,
+                    COALESCE(status, '<NULL>') AS status_value,
                     COUNT(*) AS cnt
                 FROM log_scope
-                GROUP BY COALESCE(status::text, '<NULL>')
+                GROUP BY COALESCE(status, '<NULL>')
             ) x
         ),
-
-        'data_source_counts',
-        (
+        'data_source_counts', (
             SELECT COALESCE(
                 jsonb_object_agg(source_value, cnt),
                 '{}'::jsonb
             )
             FROM (
                 SELECT
-                    COALESCE(data_source::text, '<NULL>') AS source_value,
+                    COALESCE(data_source, '<NULL>') AS source_value,
                     COUNT(*) AS cnt
                 FROM log_scope
-                GROUP BY COALESCE(data_source::text, '<NULL>')
+                GROUP BY COALESCE(data_source, '<NULL>')
             ) x
-        ),
-
-        'rows_with_exclusion_reason',
-            (SELECT COUNT(*) FROM log_scope WHERE exclusion_reason_id IS NOT NULL),
-
-        'rows_with_future_reporting_date',
-            (SELECT COUNT(*) FROM log_scope WHERE future_reporting_date IS NOT NULL),
-
-        'rows_with_efile_batch_id',
-            (SELECT COUNT(*) FROM log_scope WHERE efile_batch_id IS NOT NULL)
+        )
     ),
 
-    'rule_hit_reconciliation_analysis',
-    jsonb_build_object(
+    'reconciliation_analysis', jsonb_build_object(
         'rows', (SELECT COUNT(*) FROM analysis_scope),
-        'distinct_report_groups',
-            (SELECT COUNT(DISTINCT rpt_grp_id) FROM analysis_scope),
-        'distinct_runs',
-            (SELECT COUNT(DISTINCT (rpt_grp_id, run_date, seq_no)) FROM analysis_scope),
-        'min_created_timestamp',
-            (SELECT MIN(created_timestamp) FROM analysis_scope),
-        'max_created_timestamp',
-            (SELECT MAX(created_timestamp) FROM analysis_scope),
-
-        'description_counts',
-        (
+        'distinct_runs', (
+            SELECT COUNT(DISTINCT (run_date, seq_no, rpt_grp_id))
+            FROM analysis_scope
+        ),
+        'distinct_report_groups', (
+            SELECT COUNT(DISTINCT rpt_grp_id)
+            FROM analysis_scope
+        ),
+        'description_counts', (
             SELECT COALESCE(
                 jsonb_object_agg(description_value, cnt),
                 '{}'::jsonb
             )
             FROM (
                 SELECT
-                    COALESCE(description::text, '<NULL>') AS description_value,
+                    COALESCE(description, '<NULL>') AS description_value,
                     COUNT(*) AS cnt
                 FROM analysis_scope
-                GROUP BY COALESCE(description::text, '<NULL>')
+                GROUP BY COALESCE(description, '<NULL>')
             ) x
         )
     ),
 
-    'unprocessed_rule_hits',
-    jsonb_build_object(
+    'unprocessed_rule_hits', jsonb_build_object(
         'rows', (SELECT COUNT(*) FROM unprocessed_scope),
-        'min_created_timestamp',
-            (SELECT MIN(created_timestamp) FROM unprocessed_scope),
-        'max_created_timestamp',
-            (SELECT MAX(created_timestamp) FROM unprocessed_scope),
-
-        'is_processed_counts',
-        (
-            SELECT COALESCE(
-                jsonb_object_agg(flag_value, cnt),
-                '{}'::jsonb
-            )
-            FROM (
-                SELECT
-                    COALESCE(is_processed::text, '<NULL>') AS flag_value,
-                    COUNT(*) AS cnt
-                FROM unprocessed_scope
-                GROUP BY COALESCE(is_processed::text, '<NULL>')
-            ) x
+        'distinct_report_groups', (
+            SELECT COUNT(DISTINCT rpt_grp_id)
+            FROM unprocessed_scope
         ),
-
-        'is_reported_counts',
-        (
-            SELECT COALESCE(
-                jsonb_object_agg(flag_value, cnt),
-                '{}'::jsonb
-            )
-            FROM (
-                SELECT
-                    COALESCE(is_reported::text, '<NULL>') AS flag_value,
-                    COUNT(*) AS cnt
-                FROM unprocessed_scope
-                GROUP BY COALESCE(is_reported::text, '<NULL>')
-            ) x
+        'reported_true', (
+            SELECT COUNT(*) FROM unprocessed_scope WHERE is_reported IS TRUE
         ),
-
-        'status_counts',
-        (
+        'reported_false', (
+            SELECT COUNT(*) FROM unprocessed_scope WHERE is_reported IS FALSE
+        ),
+        'reported_null', (
+            SELECT COUNT(*) FROM unprocessed_scope WHERE is_reported IS NULL
+        ),
+        'status_counts', (
             SELECT COALESCE(
                 jsonb_object_agg(status_value, cnt),
                 '{}'::jsonb
             )
             FROM (
                 SELECT
-                    COALESCE(status::text, '<NULL>') AS status_value,
+                    COALESCE(status, '<NULL>') AS status_value,
                     COUNT(*) AS cnt
                 FROM unprocessed_scope
-                GROUP BY COALESCE(status::text, '<NULL>')
+                GROUP BY COALESCE(status, '<NULL>')
             ) x
         ),
-
-        'data_source_counts',
-        (
+        'data_source_counts', (
             SELECT COALESCE(
                 jsonb_object_agg(source_value, cnt),
                 '{}'::jsonb
             )
             FROM (
                 SELECT
-                    COALESCE(data_source::text, '<NULL>') AS source_value,
+                    COALESCE(data_source, '<NULL>') AS source_value,
                     COUNT(*) AS cnt
                 FROM unprocessed_scope
-                GROUP BY COALESCE(data_source::text, '<NULL>')
+                GROUP BY COALESCE(data_source, '<NULL>')
             ) x
         )
     )
@@ -1117,7 +1062,7 @@ SELECT jsonb_build_object(
 ## Q14 — Prove the aggregate-to-detail reconciliation join
 
 ```sql
-WITH scoped_reconciliation AS (
+WITH recon AS (
     SELECT *
     FROM pharos.rule_hit_reconciliation
     WHERE created_timestamp >= TIMESTAMPTZ '2026-06-01 00:00:00+00'
@@ -1128,7 +1073,13 @@ log_counts AS (
         rpt_grp_id,
         run_date,
         seq_no,
-        COUNT(*) AS log_rows
+        COUNT(*) AS log_rows,
+        COUNT(DISTINCT external_txn_key) AS distinct_external_txn_keys,
+        COUNT(DISTINCT rule_id) AS distinct_rules,
+        COUNT(*) FILTER (WHERE is_processed IS TRUE) AS processed_rows,
+        COUNT(*) FILTER (WHERE is_processed IS FALSE) AS unprocessed_rows,
+        COUNT(*) FILTER (WHERE is_reported IS TRUE) AS reported_rows,
+        COUNT(*) FILTER (WHERE is_reported IS FALSE) AS not_reported_rows
     FROM pharos.rule_hit_reconciliation_log
     GROUP BY rpt_grp_id, run_date, seq_no
 ),
@@ -1137,168 +1088,161 @@ analysis_counts AS (
         rpt_grp_id,
         run_date,
         seq_no,
-        COUNT(*) AS analysis_rows
+        COUNT(*) AS analysis_rows,
+        COUNT(DISTINCT txn_sur_key) AS distinct_txn_sur_keys,
+        COUNT(DISTINCT rule_id) AS distinct_rules
     FROM pharos.rule_hit_reconciliation_analysis
     GROUP BY rpt_grp_id, run_date, seq_no
 ),
-comparison AS (
+joined AS (
     SELECT
         r.rpt_grp_id,
         r.rpt_grp_name,
         r.run_date,
         r.seq_no,
+
         r.distinct_rule_hits_count_iwra AS expected_rule_hits,
         r.distinct_rule_hits_count_pharos AS matched_rule_hits,
         r.missed_rule_hits_count_pharos AS missed_rule_hits,
+
         COALESCE(l.log_rows, 0) AS log_rows,
-        COALESCE(a.analysis_rows, 0) AS analysis_rows
-    FROM scoped_reconciliation r
+        COALESCE(l.distinct_external_txn_keys, 0) AS log_distinct_transactions,
+        COALESCE(l.distinct_rules, 0) AS log_distinct_rules,
+        COALESCE(l.processed_rows, 0) AS log_processed_rows,
+        COALESCE(l.unprocessed_rows, 0) AS log_unprocessed_rows,
+        COALESCE(l.reported_rows, 0) AS log_reported_rows,
+        COALESCE(l.not_reported_rows, 0) AS log_not_reported_rows,
+
+        COALESCE(a.analysis_rows, 0) AS analysis_rows,
+        COALESCE(a.distinct_txn_sur_keys, 0) AS analysis_distinct_transactions,
+        COALESCE(a.distinct_rules, 0) AS analysis_distinct_rules
+
+    FROM recon r
     LEFT JOIN log_counts l
-        ON l.rpt_grp_id = r.rpt_grp_id
-       AND l.run_date   = r.run_date
-       AND l.seq_no     = r.seq_no
+      ON l.rpt_grp_id = r.rpt_grp_id
+     AND l.run_date = r.run_date
+     AND l.seq_no = r.seq_no
     LEFT JOIN analysis_counts a
-        ON a.rpt_grp_id = r.rpt_grp_id
-       AND a.run_date   = r.run_date
-       AND a.seq_no     = r.seq_no
+      ON a.rpt_grp_id = r.rpt_grp_id
+     AND a.run_date = r.run_date
+     AND a.seq_no = r.seq_no
 )
 SELECT jsonb_build_object(
-    'query_id', 'VAL_14_RECON_DETAIL_JOIN',
+    'query_id', 'VAL_14_RECON_DETAIL_LINKAGE',
 
-    'aggregate_rows',
-        COUNT(*),
+    'reconciliation_rows', COUNT(*),
 
-    'aggregate_rows_with_log',
+    'rows_with_log_evidence',
         COUNT(*) FILTER (WHERE log_rows > 0),
 
-    'aggregate_rows_without_log',
+    'rows_without_log_evidence',
         COUNT(*) FILTER (WHERE log_rows = 0),
 
-    'aggregate_rows_with_analysis',
+    'rows_with_analysis_evidence',
         COUNT(*) FILTER (WHERE analysis_rows > 0),
 
-    'aggregate_rows_without_analysis',
+    'rows_without_analysis_evidence',
         COUNT(*) FILTER (WHERE analysis_rows = 0),
 
+    'rows_with_misses',
+        COUNT(*) FILTER (WHERE missed_rule_hits > 0),
+
+    'miss_rows_with_log_evidence',
+        COUNT(*) FILTER (
+            WHERE missed_rule_hits > 0
+              AND log_rows > 0
+        ),
+
+    'miss_rows_with_analysis_evidence',
+        COUNT(*) FILTER (
+            WHERE missed_rule_hits > 0
+              AND analysis_rows > 0
+        ),
+
     'samples',
-    (
-        SELECT COALESCE(
-            jsonb_agg(to_jsonb(x)),
-            '[]'::jsonb
+        (
+            SELECT COALESCE(
+                jsonb_agg(to_jsonb(x)),
+                '[]'::jsonb
+            )
+            FROM (
+                SELECT *
+                FROM joined
+                ORDER BY
+                    missed_rule_hits DESC,
+                    expected_rule_hits DESC
+                LIMIT 50
+            ) x
         )
-        FROM (
-            SELECT *
-            FROM comparison
-            ORDER BY missed_rule_hits DESC,
-                     expected_rule_hits DESC
-            LIMIT 30
-        ) x
-    )
 ) AS result
-FROM comparison;
+FROM joined;
 ```
 
 ## Q15 — Determine what actually reconstructs Expected / Matched / Missed
 
 ```sql
-WITH scoped_reconciliation AS (
+WITH recon AS (
     SELECT *
     FROM pharos.rule_hit_reconciliation
     WHERE created_timestamp >= TIMESTAMPTZ '2026-06-01 00:00:00+00'
       AND created_timestamp <  TIMESTAMPTZ '2026-07-01 00:00:00+00'
+      AND COALESCE(missed_rule_hits_count_pharos, 0) > 0
 ),
-scoped_runs AS (
-    SELECT DISTINCT
-        rpt_grp_id,
-        run_date,
-        seq_no
-    FROM scoped_reconciliation
-),
-latest_log AS (
-    SELECT DISTINCT ON (
-        l.rpt_grp_id,
-        l.run_date,
-        l.seq_no,
-        l.external_txn_key,
-        l.rule_id,
-        l.attempt_id,
-        l.bucket_id
-    )
-        l.*
-    FROM pharos.rule_hit_reconciliation_log l
-    JOIN scoped_runs s
-      ON s.rpt_grp_id = l.rpt_grp_id
-     AND s.run_date   = l.run_date
-     AND s.seq_no     = l.seq_no
-    ORDER BY
-        l.rpt_grp_id,
-        l.run_date,
-        l.seq_no,
-        l.external_txn_key,
-        l.rule_id,
-        l.attempt_id,
-        l.bucket_id,
-        l.modified_timestamp DESC NULLS LAST,
-        l.created_timestamp DESC NULLS LAST
-),
-detail_counts AS (
+log_stats AS (
     SELECT
         rpt_grp_id,
         run_date,
         seq_no,
 
-        COUNT(*) AS detail_keys,
+        COUNT(*) AS total_log_rows,
 
         COUNT(*) FILTER (
             WHERE is_processed IS FALSE
-        ) AS processed_false,
+        ) AS not_processed_rows,
 
         COUNT(*) FILTER (
             WHERE is_reported IS FALSE
-        ) AS reported_false,
+        ) AS not_reported_rows,
 
         COUNT(*) FILTER (
             WHERE is_processed IS FALSE
               AND is_reported IS FALSE
-        ) AS processed_false_and_reported_false,
+        ) AS not_processed_not_reported_rows,
 
         COUNT(*) FILTER (
             WHERE exclusion_reason_id IS NOT NULL
-        ) AS exclusion_reason_present,
+        ) AS excluded_rows,
 
         COUNT(*) FILTER (
             WHERE future_reporting_date IS NOT NULL
-        ) AS future_reporting_present,
+        ) AS future_reporting_rows
 
-        COUNT(*) FILTER (
-            WHERE efile_batch_id IS NOT NULL
-        ) AS efile_batch_present,
-
-        jsonb_object_agg_status.status_counts
-
-    FROM latest_log l
-    LEFT JOIN LATERAL (
-        SELECT COALESCE(
-            jsonb_object_agg(status_value, cnt),
-            '{}'::jsonb
-        ) AS status_counts
-        FROM (
-            SELECT
-                COALESCE(l2.status::text, '<NULL>') AS status_value,
-                COUNT(*) AS cnt
-            FROM latest_log l2
-            WHERE l2.rpt_grp_id = l.rpt_grp_id
-              AND l2.run_date   = l.run_date
-              AND l2.seq_no     = l.seq_no
-            GROUP BY COALESCE(l2.status::text, '<NULL>')
-        ) s
-    ) jsonb_object_agg_status ON TRUE
-
-    GROUP BY
+    FROM pharos.rule_hit_reconciliation_log
+    GROUP BY rpt_grp_id, run_date, seq_no
+),
+analysis_stats AS (
+    SELECT
         rpt_grp_id,
         run_date,
         seq_no,
-        jsonb_object_agg_status.status_counts
+        COUNT(*) AS analysis_rows
+    FROM pharos.rule_hit_reconciliation_analysis
+    GROUP BY rpt_grp_id, run_date, seq_no
+),
+unprocessed_stats AS (
+    SELECT
+        rpt_grp_id,
+        COUNT(*) AS unprocessed_table_rows,
+        COUNT(*) FILTER (
+            WHERE is_reported IS FALSE
+        ) AS unprocessed_not_reported_rows,
+        COUNT(*) FILTER (
+            WHERE exclusion_reason_id IS NOT NULL
+        ) AS unprocessed_excluded_rows
+    FROM pharos.unprocessed_rule_hits
+    WHERE created_timestamp >= TIMESTAMPTZ '2026-06-01 00:00:00+00'
+      AND created_timestamp <  TIMESTAMPTZ '2026-07-01 00:00:00+00'
+    GROUP BY rpt_grp_id
 ),
 comparison AS (
     SELECT
@@ -1307,97 +1251,90 @@ comparison AS (
         r.run_date,
         r.seq_no,
 
-        COALESCE(r.distinct_rule_hits_count_iwra, 0)
-            AS expected_rule_hits,
+        r.distinct_rule_hits_count_iwra AS expected_rule_hits,
+        r.distinct_rule_hits_count_pharos AS matched_rule_hits,
+        r.missed_rule_hits_count_pharos AS missed_rule_hits,
 
-        COALESCE(r.distinct_rule_hits_count_pharos, 0)
-            AS matched_rule_hits,
+        COALESCE(l.total_log_rows, 0) AS total_log_rows,
+        COALESCE(l.not_processed_rows, 0) AS log_not_processed,
+        COALESCE(l.not_reported_rows, 0) AS log_not_reported,
+        COALESCE(l.not_processed_not_reported_rows, 0)
+            AS log_not_processed_not_reported,
+        COALESCE(l.excluded_rows, 0) AS log_excluded,
+        COALESCE(l.future_reporting_rows, 0) AS log_future_reporting,
 
-        COALESCE(r.missed_rule_hits_count_pharos, 0)
-            AS missed_rule_hits,
+        COALESCE(a.analysis_rows, 0) AS analysis_rows,
 
-        COALESCE(d.detail_keys, 0)
-            AS detail_keys,
+        COALESCE(u.unprocessed_table_rows, 0)
+            AS unprocessed_table_rows,
+        COALESCE(u.unprocessed_not_reported_rows, 0)
+            AS unprocessed_not_reported_rows,
+        COALESCE(u.unprocessed_excluded_rows, 0)
+            AS unprocessed_excluded_rows
 
-        COALESCE(d.processed_false, 0)
-            AS processed_false,
+    FROM recon r
 
-        COALESCE(d.reported_false, 0)
-            AS reported_false,
+    LEFT JOIN log_stats l
+      ON l.rpt_grp_id = r.rpt_grp_id
+     AND l.run_date = r.run_date
+     AND l.seq_no = r.seq_no
 
-        COALESCE(d.processed_false_and_reported_false, 0)
-            AS processed_false_and_reported_false,
+    LEFT JOIN analysis_stats a
+      ON a.rpt_grp_id = r.rpt_grp_id
+     AND a.run_date = r.run_date
+     AND a.seq_no = r.seq_no
 
-        COALESCE(d.exclusion_reason_present, 0)
-            AS exclusion_reason_present,
-
-        COALESCE(d.future_reporting_present, 0)
-            AS future_reporting_present,
-
-        COALESCE(d.efile_batch_present, 0)
-            AS efile_batch_present,
-
-        COALESCE(d.status_counts, '{}'::jsonb)
-            AS status_counts
-
-    FROM scoped_reconciliation r
-    LEFT JOIN detail_counts d
-      ON d.rpt_grp_id = r.rpt_grp_id
-     AND d.run_date   = r.run_date
-     AND d.seq_no     = r.seq_no
+    LEFT JOIN unprocessed_stats u
+      ON u.rpt_grp_id = r.rpt_grp_id
 )
 SELECT jsonb_build_object(
-    'query_id', 'VAL_15_RECON_MISSED_PREDICATES',
+    'query_id', 'VAL_15_MISSED_HIT_EVIDENCE',
 
-    'total_reconciliation_rows',
+    'reconciliation_rows_with_misses',
         COUNT(*),
 
-    'expected_equals_detail_keys',
+    'total_expected_rule_hits',
+        COALESCE(SUM(expected_rule_hits), 0),
+
+    'total_matched_rule_hits',
+        COALESCE(SUM(matched_rule_hits), 0),
+
+    'total_missed_rule_hits',
+        COALESCE(SUM(missed_rule_hits), 0),
+
+    'rows_where_log_not_processed_equals_missed',
         COUNT(*) FILTER (
-            WHERE expected_rule_hits = detail_keys
+            WHERE log_not_processed = missed_rule_hits
         ),
 
-    'missed_equals_processed_false',
+    'rows_where_log_not_reported_equals_missed',
         COUNT(*) FILTER (
-            WHERE missed_rule_hits = processed_false
+            WHERE log_not_reported = missed_rule_hits
         ),
 
-    'missed_equals_reported_false',
+    'rows_where_log_not_processed_not_reported_equals_missed',
         COUNT(*) FILTER (
-            WHERE missed_rule_hits = reported_false
+            WHERE log_not_processed_not_reported = missed_rule_hits
         ),
 
-    'missed_equals_processed_false_and_reported_false',
+    'rows_where_analysis_count_equals_missed',
         COUNT(*) FILTER (
-            WHERE missed_rule_hits =
-                  processed_false_and_reported_false
+            WHERE analysis_rows = missed_rule_hits
         ),
 
-    'missed_equals_exclusion_reason_present',
-        COUNT(*) FILTER (
-            WHERE missed_rule_hits =
-                  exclusion_reason_present
-        ),
-
-    'matched_equals_efile_batch_present',
-        COUNT(*) FILTER (
-            WHERE matched_rule_hits =
-                  efile_batch_present
-        ),
-
-    'rows',
-    (
-        SELECT COALESCE(
-            jsonb_agg(to_jsonb(x)),
-            '[]'::jsonb
+    'samples',
+        (
+            SELECT COALESCE(
+                jsonb_agg(to_jsonb(x)),
+                '[]'::jsonb
+            )
+            FROM (
+                SELECT *
+                FROM comparison
+                ORDER BY missed_rule_hits DESC
+                LIMIT 50
+            ) x
         )
-        FROM (
-            SELECT *
-            FROM comparison
-            ORDER BY missed_rule_hits DESC,
-                     expected_rule_hits DESC
-        ) x
-    )
 ) AS result
 FROM comparison;
 ```
