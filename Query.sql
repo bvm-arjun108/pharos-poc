@@ -1304,3 +1304,191 @@ SELECT jsonb_build_object(
         )
 
 ) AS validation_result;
+
+===========================================================================================================
+
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+/* August transformation batches */
+batches AS (
+    SELECT DISTINCT
+        rpt_grp_id,
+        batch_id
+    FROM report_transformation_reconciliation r
+    CROSS JOIN params p
+    WHERE r.created_timestamp >= p.start_date
+      AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+),
+
+/*
+ One logical transaction per batch.
+ Journey has multiple stage rows for the same transaction.
+*/
+journey_txns AS (
+    SELECT DISTINCT
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier,
+        j.mtcn,
+        j.txn_metadata ->> 'txn_sur_key' AS txn_sur_key
+    FROM record_transformation_journey j
+    JOIN batches b
+      ON b.rpt_grp_id = j.rpt_grp_id
+     AND b.batch_id = j.batch_id
+),
+
+/*
+ Rule hits linked to transformation batches using the
+ batch bridge we already validated.
+*/
+rule_hits AS (
+    SELECT
+        rh.rpt_grp_id,
+        rh.efile_batch_id,
+        rh.rule_id,
+        rh.attempt_id,
+        rh.external_txn_key,
+        rh.mtcn,
+        rh.galactic_id,
+        rh.is_reported,
+        rh.exclusion_reason_id
+    FROM rule_hit rh
+    JOIN batches b
+      ON b.rpt_grp_id = rh.rpt_grp_id
+     AND b.batch_id = rh.efile_batch_id
+),
+
+/* Candidate 1: txn_sur_key -> external_txn_key */
+txn_sur_key_match AS (
+    SELECT
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier,
+        COUNT(DISTINCT rh.external_txn_key) AS external_keys_found
+    FROM journey_txns j
+    JOIN rule_hits rh
+      ON rh.rpt_grp_id = j.rpt_grp_id
+     AND rh.efile_batch_id = j.batch_id
+     AND rh.external_txn_key::text = j.txn_sur_key
+    GROUP BY
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier
+),
+
+/* Candidate 2: MTCN -> MTCN */
+mtcn_match AS (
+    SELECT
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier,
+        COUNT(DISTINCT rh.external_txn_key) AS external_keys_found
+    FROM journey_txns j
+    JOIN rule_hits rh
+      ON rh.rpt_grp_id = j.rpt_grp_id
+     AND rh.efile_batch_id = j.batch_id
+     AND rh.mtcn = j.mtcn
+    WHERE j.mtcn IS NOT NULL
+    GROUP BY
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier
+),
+
+/* Candidate 3: identifier -> external_txn_key */
+identifier_external_match AS (
+    SELECT
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier,
+        COUNT(DISTINCT rh.external_txn_key) AS external_keys_found
+    FROM journey_txns j
+    JOIN rule_hits rh
+      ON rh.rpt_grp_id = j.rpt_grp_id
+     AND rh.efile_batch_id = j.batch_id
+     AND rh.external_txn_key::text = j.identifier
+    GROUP BY
+        j.rpt_grp_id,
+        j.batch_id,
+        j.identifier
+),
+
+summary AS (
+    SELECT
+        'txn_metadata.txn_sur_key -> rule_hit.external_txn_key' AS candidate,
+        COUNT(*) AS matched_transactions,
+        COUNT(*) FILTER (WHERE external_keys_found = 1)
+            AS uniquely_matched_transactions,
+        COUNT(*) FILTER (WHERE external_keys_found > 1)
+            AS ambiguous_transactions
+    FROM txn_sur_key_match
+
+    UNION ALL
+
+    SELECT
+        'journey.mtcn -> rule_hit.mtcn',
+        COUNT(*),
+        COUNT(*) FILTER (WHERE external_keys_found = 1),
+        COUNT(*) FILTER (WHERE external_keys_found > 1)
+    FROM mtcn_match
+
+    UNION ALL
+
+    SELECT
+        'journey.identifier -> rule_hit.external_txn_key',
+        COUNT(*),
+        COUNT(*) FILTER (WHERE external_keys_found = 1),
+        COUNT(*) FILTER (WHERE external_keys_found > 1)
+    FROM identifier_external_match
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_04_TRANSACTION_BRIDGE',
+
+    'period',
+        jsonb_build_object(
+            'start_date', '2026-08-01',
+            'end_date', '2026-08-31'
+        ),
+
+    'total_journey_transactions',
+        (SELECT COUNT(*) FROM journey_txns),
+
+    'journey_transactions_with_txn_sur_key',
+        (
+            SELECT COUNT(*)
+            FROM journey_txns
+            WHERE txn_sur_key IS NOT NULL
+        ),
+
+    'journey_transactions_with_mtcn',
+        (
+            SELECT COUNT(*)
+            FROM journey_txns
+            WHERE mtcn IS NOT NULL
+        ),
+
+    'candidate_transaction_bridges',
+        (
+            SELECT jsonb_agg(
+                jsonb_build_object(
+                    'candidate', candidate,
+                    'matched_transactions', matched_transactions,
+                    'uniquely_matched_transactions',
+                        uniquely_matched_transactions,
+                    'ambiguous_transactions',
+                        ambiguous_transactions
+                )
+                ORDER BY matched_transactions DESC
+            )
+            FROM summary
+        )
+
+) AS validation_result;
