@@ -1842,3 +1842,312 @@ SELECT jsonb_build_object(
 ) AS validation_result
 
 FROM scored;
+
+=================================================================================================================================
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+latest_recon AS (
+    SELECT *
+    FROM (
+        SELECT
+            r.*,
+            ROW_NUMBER() OVER (
+                PARTITION BY r.rpt_grp_id, r.run_date
+                ORDER BY r.seq_no DESC, r.modified_timestamp DESC
+            ) AS rn
+        FROM rule_hit_reconciliation r
+        CROSS JOIN params p
+        WHERE r.created_timestamp >= p.start_date
+          AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+    ) x
+    WHERE rn = 1
+),
+
+detail AS (
+    SELECT
+        lr.rpt_grp_id,
+        lr.rpt_grp_name,
+        lr.run_date,
+        lr.seq_no,
+        lr.created_timestamp,
+        lr.data_selection_start_date,
+        lr.data_selection_end_date,
+
+        COALESCE(lr.distinct_rule_hits_count_iwra,0)
+            AS reconciliation_expected,
+
+        COALESCE(lr.distinct_rule_hits_count_pharos,0)
+            AS reconciliation_matched,
+
+        COALESCE(lr.missed_rule_hits_count_pharos,0)
+            AS reconciliation_missed,
+
+        COUNT(rh.*) AS rule_hit_rows,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) AS distinct_rule_hit_keys,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.exclusion_reason_id IS NULL
+              AND rh.is_reported = FALSE
+        ) AS missed_is_reported_false,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.exclusion_reason_id IS NULL
+              AND rh.is_reported IS NOT TRUE
+        ) AS missed_is_reported_not_true,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.exclusion_reason_id IS NULL
+              AND rh.reporting_timestamp IS NULL
+        ) AS missed_reporting_timestamp_null,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.exclusion_reason_id IS NULL
+              AND rh.reported_batch_id IS NULL
+        ) AS missed_reported_batch_null,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.exclusion_reason_id IS NULL
+              AND rh.is_reported = TRUE
+        ) AS matched_true_nonexcluded,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.is_reported = TRUE
+        ) AS matched_true_all,
+
+        COUNT(
+            DISTINCT (
+                rh.external_txn_key,
+                rh.rule_id
+            )
+        ) FILTER (
+            WHERE rh.reporting_timestamp IS NOT NULL
+        ) AS matched_timestamp_present
+
+    FROM latest_recon lr
+
+    LEFT JOIN rule_hit rh
+      ON rh.rpt_grp_id = lr.rpt_grp_id
+     AND rh.transaction_date >= lr.data_selection_start_date
+     AND rh.transaction_date <= lr.data_selection_end_date
+
+    GROUP BY
+        lr.rpt_grp_id,
+        lr.rpt_grp_name,
+        lr.run_date,
+        lr.seq_no,
+        lr.created_timestamp,
+        lr.data_selection_start_date,
+        lr.data_selection_end_date,
+        lr.distinct_rule_hits_count_iwra,
+        lr.distinct_rule_hits_count_pharos,
+        lr.missed_rule_hits_count_pharos
+),
+
+scored AS (
+    SELECT
+        *,
+
+        missed_is_reported_false
+            - reconciliation_missed
+            AS variance_missed_false,
+
+        missed_is_reported_not_true
+            - reconciliation_missed
+            AS variance_missed_not_true,
+
+        missed_reporting_timestamp_null
+            - reconciliation_missed
+            AS variance_missed_timestamp_null,
+
+        missed_reported_batch_null
+            - reconciliation_missed
+            AS variance_missed_reported_batch_null,
+
+        matched_true_nonexcluded
+            - reconciliation_matched
+            AS variance_matched_true_nonexcluded,
+
+        matched_true_all
+            - reconciliation_matched
+            AS variance_matched_true_all,
+
+        matched_timestamp_present
+            - reconciliation_matched
+            AS variance_matched_timestamp_present
+
+    FROM detail
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_05B_RULE_HIT_DETAIL_DEFINITION',
+
+    'period',
+        jsonb_build_object(
+            'start_date', '2026-08-01',
+            'end_date', '2026-08-31'
+        ),
+
+    'summary',
+        jsonb_build_object(
+
+            'reconciliation_populations',
+                COUNT(*),
+
+            'missed_false_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_missed_false = 0
+                ),
+
+            'missed_not_true_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_missed_not_true = 0
+                ),
+
+            'missed_timestamp_null_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_missed_timestamp_null = 0
+                ),
+
+            'missed_reported_batch_null_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_missed_reported_batch_null = 0
+                ),
+
+            'matched_true_nonexcluded_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_matched_true_nonexcluded = 0
+                ),
+
+            'matched_true_all_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_matched_true_all = 0
+                ),
+
+            'matched_timestamp_present_exact_matches',
+                COUNT(*) FILTER (
+                    WHERE variance_matched_timestamp_present = 0
+                )
+        ),
+
+    'rows',
+        COALESCE(
+            jsonb_agg(
+                jsonb_build_object(
+
+                    'rpt_grp_id', rpt_grp_id,
+                    'rpt_grp_name', rpt_grp_name,
+                    'run_date', run_date,
+                    'created_timestamp', created_timestamp,
+
+                    'data_selection_start_date',
+                        data_selection_start_date,
+
+                    'data_selection_end_date',
+                        data_selection_end_date,
+
+                    'reconciliation_expected',
+                        reconciliation_expected,
+
+                    'reconciliation_matched',
+                        reconciliation_matched,
+
+                    'reconciliation_missed',
+                        reconciliation_missed,
+
+                    'rule_hit_rows',
+                        rule_hit_rows,
+
+                    'distinct_rule_hit_keys',
+                        distinct_rule_hit_keys,
+
+                    'candidate_missed_counts',
+                        jsonb_build_object(
+                            'is_reported_false',
+                                missed_is_reported_false,
+                            'is_reported_not_true',
+                                missed_is_reported_not_true,
+                            'reporting_timestamp_null',
+                                missed_reporting_timestamp_null,
+                            'reported_batch_null',
+                                missed_reported_batch_null
+                        ),
+
+                    'candidate_matched_counts',
+                        jsonb_build_object(
+                            'is_reported_true_nonexcluded',
+                                matched_true_nonexcluded,
+                            'is_reported_true_all',
+                                matched_true_all,
+                            'reporting_timestamp_present',
+                                matched_timestamp_present
+                        ),
+
+                    'variances',
+                        jsonb_build_object(
+                            'missed_false',
+                                variance_missed_false,
+                            'missed_not_true',
+                                variance_missed_not_true,
+                            'missed_timestamp_null',
+                                variance_missed_timestamp_null,
+                            'missed_reported_batch_null',
+                                variance_missed_reported_batch_null,
+                            'matched_true_nonexcluded',
+                                variance_matched_true_nonexcluded,
+                            'matched_true_all',
+                                variance_matched_true_all,
+                            'matched_timestamp_present',
+                                variance_matched_timestamp_present
+                        )
+                )
+                ORDER BY rpt_grp_name, created_timestamp
+            ),
+            '[]'::jsonb
+        )
+
+) AS validation_result
+
+FROM scored;
