@@ -2151,3 +2151,141 @@ SELECT jsonb_build_object(
 ) AS validation_result
 
 FROM scored;
+
+
+
+===========================================================================================================================================
+
+WITH recon AS (
+    SELECT *
+    FROM rule_hit_reconciliation
+    WHERE rpt_grp_id = 600000015
+      AND run_date = 20260715
+    ORDER BY seq_no DESC, modified_timestamp DESC
+    LIMIT 1
+),
+
+rh_stats AS (
+    SELECT
+        r.rpt_grp_id,
+        r.rpt_grp_name,
+        r.run_date,
+        r.seq_no,
+        r.created_timestamp,
+        r.modified_timestamp,
+        r.data_selection_start_date,
+        r.data_selection_end_date,
+
+        r.distinct_rule_hits_count_iwra,
+        r.distinct_rule_hits_count_pharos,
+        r.missed_rule_hits_count_pharos,
+
+        /* All available rule hits for the report group */
+        (
+            SELECT COUNT(*)
+            FROM rule_hit rh
+            WHERE rh.rpt_grp_id = r.rpt_grp_id
+        ) AS all_rule_hit_rows,
+
+        /* transaction_date business-window candidate */
+        (
+            SELECT COUNT(*)
+            FROM rule_hit rh
+            WHERE rh.rpt_grp_id = r.rpt_grp_id
+              AND rh.transaction_date >= r.data_selection_start_date
+              AND rh.transaction_date <= r.data_selection_end_date
+        ) AS by_transaction_date,
+
+        /* created_timestamp candidate */
+        (
+            SELECT COUNT(*)
+            FROM rule_hit rh
+            WHERE rh.rpt_grp_id = r.rpt_grp_id
+              AND rh.created_timestamp >= r.data_selection_start_date
+              AND rh.created_timestamp <= r.data_selection_end_date
+        ) AS by_created_timestamp,
+
+        /* reporting_timestamp candidate */
+        (
+            SELECT COUNT(*)
+            FROM rule_hit rh
+            WHERE rh.rpt_grp_id = r.rpt_grp_id
+              AND rh.reporting_timestamp >= r.data_selection_start_date
+              AND rh.reporting_timestamp <= r.data_selection_end_date
+        ) AS by_reporting_timestamp,
+
+        /* rows around reconciliation execution */
+        (
+            SELECT COUNT(*)
+            FROM rule_hit rh
+            WHERE rh.rpt_grp_id = r.rpt_grp_id
+              AND rh.created_timestamp >= r.created_timestamp - INTERVAL '7 days'
+              AND rh.created_timestamp <= r.created_timestamp + INTERVAL '7 days'
+        ) AS created_within_7_days_of_recon,
+
+        /* Useful sample of actual rows */
+        (
+            SELECT COALESCE(
+                jsonb_agg(x),
+                '[]'::jsonb
+            )
+            FROM (
+                SELECT jsonb_build_object(
+                    'rule_id', rh.rule_id,
+                    'attempt_id', rh.attempt_id,
+                    'external_txn_key', rh.external_txn_key,
+                    'mtcn', rh.mtcn,
+                    'is_reported', rh.is_reported,
+                    'exclusion_reason_id', rh.exclusion_reason_id,
+                    'transaction_date', rh.transaction_date,
+                    'created_timestamp', rh.created_timestamp,
+                    'reporting_timestamp', rh.reporting_timestamp,
+                    'efile_batch_id', rh.efile_batch_id,
+                    'reported_batch_id', rh.reported_batch_id
+                ) AS x
+                FROM rule_hit rh
+                WHERE rh.rpt_grp_id = r.rpt_grp_id
+                ORDER BY rh.created_timestamp DESC
+                LIMIT 30
+            ) s
+        ) AS latest_rule_hit_samples
+
+    FROM recon r
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_05C_LOCATE_RECON_DETAIL',
+
+    'reconciliation',
+        jsonb_build_object(
+            'rpt_grp_id', rpt_grp_id,
+            'rpt_grp_name', rpt_grp_name,
+            'run_date', run_date,
+            'seq_no', seq_no,
+            'created_timestamp', created_timestamp,
+            'modified_timestamp', modified_timestamp,
+            'data_selection_start_date', data_selection_start_date,
+            'data_selection_end_date', data_selection_end_date,
+            'expected', distinct_rule_hits_count_iwra,
+            'matched', distinct_rule_hits_count_pharos,
+            'missed', missed_rule_hits_count_pharos
+        ),
+
+    'rule_hit_population_tests',
+        jsonb_build_object(
+            'all_rule_hit_rows_for_group', all_rule_hit_rows,
+            'by_transaction_date', by_transaction_date,
+            'by_created_timestamp', by_created_timestamp,
+            'by_reporting_timestamp', by_reporting_timestamp,
+            'created_within_7_days_of_recon',
+                created_within_7_days_of_recon
+        ),
+
+    'latest_rule_hit_samples',
+        latest_rule_hit_samples
+
+) AS validation_result
+
+FROM rh_stats;
