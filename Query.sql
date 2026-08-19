@@ -954,3 +954,121 @@ SELECT jsonb_build_object(
 ) AS validation_result
 
 FROM checks;
+
+
+===============================================================================
+
+
+WITH params AS (
+    SELECT
+        DATE '2026-08-01' AS start_date,
+        DATE '2026-08-31' AS end_date
+),
+
+transformation_batches AS (
+    SELECT DISTINCT
+        r.rpt_grp_id,
+        r.batch_id
+    FROM report_transformation_reconciliation r
+    CROSS JOIN params p
+    WHERE r.batch_id IS NOT NULL
+      AND r.created_timestamp >= p.start_date
+      AND r.created_timestamp < p.end_date + INTERVAL '1 day'
+),
+
+bridge_test AS (
+
+    SELECT
+        'rule_hit.batch_id' AS candidate_bridge,
+        COUNT(*) AS matched_rows,
+        COUNT(
+            DISTINCT (rh.rpt_grp_id, rh.batch_id)
+        ) AS matched_batch_keys
+    FROM rule_hit rh
+    JOIN transformation_batches tb
+      ON tb.rpt_grp_id = rh.rpt_grp_id
+     AND tb.batch_id = rh.batch_id::text
+
+    UNION ALL
+
+    SELECT
+        'rule_hit.efile_batch_id',
+        COUNT(*),
+        COUNT(
+            DISTINCT (rh.rpt_grp_id, rh.efile_batch_id)
+        )
+    FROM rule_hit rh
+    JOIN transformation_batches tb
+      ON tb.rpt_grp_id = rh.rpt_grp_id
+     AND tb.batch_id = rh.efile_batch_id
+
+    UNION ALL
+
+    SELECT
+        'rule_hit.reported_batch_id',
+        COUNT(*),
+        COUNT(
+            DISTINCT (rh.rpt_grp_id, rh.reported_batch_id)
+        )
+    FROM rule_hit rh
+    JOIN transformation_batches tb
+      ON tb.rpt_grp_id = rh.rpt_grp_id
+     AND tb.batch_id = rh.reported_batch_id
+
+    UNION ALL
+
+    SELECT
+        'exclusion_audit.processing_batch_id',
+        COUNT(*),
+        COUNT(
+            DISTINCT (a.rpt_grp_id, a.processing_batch_id)
+        )
+    FROM rule_hit_exclusion_audit a
+    JOIN transformation_batches tb
+      ON tb.rpt_grp_id = a.rpt_grp_id
+     AND tb.batch_id = a.processing_batch_id
+
+    UNION ALL
+
+    SELECT
+        'exclusion_audit.reported_batch_id',
+        COUNT(*),
+        COUNT(
+            DISTINCT (a.rpt_grp_id, a.reported_batch_id)
+        )
+    FROM rule_hit_exclusion_audit a
+    JOIN transformation_batches tb
+      ON tb.rpt_grp_id = a.rpt_grp_id
+     AND tb.batch_id = a.reported_batch_id
+)
+
+SELECT jsonb_build_object(
+
+    'query_id',
+        'VALIDATION_03_BATCH_BRIDGE',
+
+    'period',
+        jsonb_build_object(
+            'start_date', '2026-08-01',
+            'end_date', '2026-08-31'
+        ),
+
+    'transformation_batch_count',
+        (
+            SELECT COUNT(*)
+            FROM transformation_batches
+        ),
+
+    'candidate_bridges',
+        jsonb_agg(
+            jsonb_build_object(
+                'candidate_bridge', candidate_bridge,
+                'matched_rows', matched_rows,
+                'matched_batch_keys', matched_batch_keys
+            )
+            ORDER BY matched_rows DESC
+        )
+
+) AS validation_result
+
+FROM bridge_test;
