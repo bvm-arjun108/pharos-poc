@@ -83,42 +83,69 @@ FROM matches;
 3. Search stored functions/procedures for the reconciliation logic
 
   
-WITH matches AS (
+WITH function_defs AS MATERIALIZED (
     SELECT
         n.nspname AS schema_name,
         p.proname AS function_name,
-        pg_get_functiondef(p.oid) AS definition
+        p.prokind,
+
+        CASE
+            WHEN p.prokind IN ('f', 'p')
+            THEN pg_get_functiondef(p.oid)
+            ELSE NULL
+        END AS definition
+
     FROM pg_proc p
     JOIN pg_namespace n
       ON n.oid = p.pronamespace
-    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema')
+
+    WHERE n.nspname NOT IN (
+        'pg_catalog',
+        'information_schema'
+    )
+),
+
+matches AS (
+    SELECT
+        schema_name,
+        function_name,
+        CASE
+            WHEN prokind = 'p' THEN 'PROCEDURE'
+            ELSE 'FUNCTION'
+        END AS object_type,
+        definition
+
+    FROM function_defs
+
+    WHERE definition IS NOT NULL
       AND (
-           LOWER(pg_get_functiondef(p.oid))
-               LIKE '%distinct_rule_hits_count_iwra%'
-        OR LOWER(pg_get_functiondef(p.oid))
-               LIKE '%rule_hit_reconciliation%'
-        OR LOWER(pg_get_functiondef(p.oid))
-               LIKE '%missed_rule_hits_count_pharos%'
-        OR LOWER(pg_get_functiondef(p.oid))
-               LIKE '%iwra%'
+           LOWER(definition) LIKE '%distinct_rule_hits_count_iwra%'
+        OR LOWER(definition) LIKE '%rule_hit_publish_count_iwra%'
+        OR LOWER(definition) LIKE '%missed_rule_hits_count_pharos%'
+        OR LOWER(definition) LIKE '%rule_hit_reconciliation%'
+        OR LOWER(definition) LIKE '%iwra%'
       )
 )
 
 SELECT jsonb_build_object(
-    'query_id', 'DISCOVERY_03_IWRA_FUNCTIONS',
+    'query_id',
+        'DISCOVERY_03_IWRA_FUNCTIONS',
+
     'matching_functions',
-    COALESCE(
-        jsonb_agg(
-            jsonb_build_object(
-                'schema', schema_name,
-                'function_name', function_name,
-                'definition', definition
-            )
-            ORDER BY schema_name, function_name
-        ),
-        '[]'::jsonb
-    )
+        COALESCE(
+            jsonb_agg(
+                jsonb_build_object(
+                    'schema', schema_name,
+                    'object_name', function_name,
+                    'object_type', object_type,
+                    'definition', definition
+                )
+                ORDER BY schema_name, function_name
+            ),
+            '[]'::jsonb
+        )
 ) AS result
+
 FROM matches;
 
 
